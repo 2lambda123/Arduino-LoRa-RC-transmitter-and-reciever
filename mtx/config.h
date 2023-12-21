@@ -1,44 +1,47 @@
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
 
-//To update default values in EEPROM change the value below to anything between 0xAA and 0xAF.
-#define EE_INITFLAG 0xAB  //WARNING: Changing this will overwrite all your existing model data
+//-------------------------------
+#define _SKETCHVERSION "2.1.0"
 
-//---------------------UART baud rate----------------------------------------------------
-// #define UARTBAUDRATE 57600
-#define UARTBAUDRATE 115200
+//-------- PINS -----------------
 
-//------------------- Only enable one lcd ------------------------------------------------
+#define PIN_ROW1       2
+// #define PIN_ROW2       3
+#define PIN_ROW2      12
+#define PIN_COL1 4
+#define PIN_COL2 5
+#define PIN_COL3 6
 
-//---- LCD KS0108
-// #include "LCDKS0108.h"
-// LCDKS0108 display = LCDKS0108(8, 9, 7, 3, 10); //RS, EN, CS1, CS2, 595Latch
+#define PIN_LATCH      10
+
+#define PIN_CGM_RST    7
+#define PIN_CGM_RD     8
+#define PIN_CGM_RSEL   9
+
+#define PIN_KS_RS      8
+#define PIN_KS_EN      9
+#define PIN_KS_CS1     7
+#define PIN_KS_CS2     3
+
+#define PIN_THROTTLE   A0
+#define PIN_YAW        A1
+#define PIN_PITCH      A2
+#define PIN_ROLL       A3
+#define PIN_KNOB       A4
+#define PIN_BATTVOLTS  A5
+
+// --------- LCD ----------
+#define DISPLAY_KS0108
+// #define DISPLAY_CGM12864G
+
+//---------- Battery voltage ----
+const int battVoltsMin = 3500; //millivolts
+const int battVoltsMax = 4000; //millivolts
+const int battVfactor  = 503;  //scaling factor
+
+//-------------------------------
+#define UART_BAUD_RATE 115200  //should match secondary mcu baud
 
 
-//---- LCD CGM12864G
-#include "LCDCGM12864G_595.h"
-LCDCGM12864G_595 display = LCDCGM12864G_595(9, 8, 7, 10);
-
-//--------------- Buttons ----------------------------------------------------------------
-#define ROW1_MTRX_PIN 2
-#define ROW2_MTRX_PIN 3
-// #define ROW2_MTRX_PIN 12
-#define COL1_MTRX_PIN 4
-#define COL2_MTRX_PIN 5
-#define COL3_MTRX_PIN 6
-
-#define LONGPRESSTIME 350
-
-//---------------- Analog input pins -----------------------------------------------------
-#define BATTVOLTSPIN  A5
-#define AUX2PIN       A4
-#define ROLLINPIN     A3
-#define PITCHINPIN    A2
-#define YAWINPIN      A1
-#define THROTTLEINPIN A0
-
-//---------------- Battery ---------------------------------------------------------------
-#define BATTVFACTOR 487  //determined experimentally. Whole numbers only
-#define BATTV_MIN   3400 //in millivolts. Whole numbers only
-#define BATTV_MAX   3850 //in millivolts Whole numbers only
-
-//----------------------------------------------------------------------------------------
-#define _SKETCHVERSION "1.2.0"
+#endif

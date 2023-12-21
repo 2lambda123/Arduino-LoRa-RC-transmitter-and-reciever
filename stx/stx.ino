@@ -1,348 +1,1155 @@
-/***************************************************************************************************
-* Code for slave transmiter microcontroller 
-* BUK 2020
-* buk7456@gmail.com
+/*
+  ==================================================================================================
 
-* Tested to compile on Arduino IDE 1.8.9 or later
-* Sketch should compile without warnings even with -WALL
-***************************************************************************************************/
+  Firmware for the slave mcu of the rc transmitter.
+  Target mcu: Atmega328p
+
+  (c) 2020-2021 buk7456  
+  buk7456 at gmail dot com
+  
+  Released under the MIT Licence
+  
+  Tested to compile on Arduino IDE 1.8.9 or later.
+  The code should compile with no warnings even with -Wall.
+
+  ==================================================================================================
+*/
+
 
 #include <SPI.h>
-
 #include "LoRa.h"
-  // NOTE: This library exposes the LoRa radio directly, and allows you to send data to 
-  //       any radios in range with same radio parameters. 
-  //       All data is broadcasted and there is no addressing. 
-  //       Any LoRa radio that are configured with the same radio parameters and in range 
-  //       can see the packets you send.
-
-#include "crc16.h"
-
-bool radioInitialised = false;
-
-uint8_t dataToTransmit[12]; //Holds data to send to rc receiver
-
-const int msgLength = 32;  //bytes in master's message including start and stop
-uint8_t receivedData[msgLength];  //Holds the valid data from master mcu
-
-unsigned long lastValidMsgRcvTime;
-unsigned long validMsgCount = 0;
-
-#define RF_ENABLED 206   //As received from master mcu
-#define RF_DISABLED 207  //As received from master mcu
-
-
-//--------Tone stuff----------
+#include "crc8.h"
+#include <EEPROM.h>
 #include "NonBlockingRtttl.h"
 
-#define AUDIO_NONE          0xD2  
-#define AUDIO_TIMERELAPSED  0xD3  
-#define AUDIO_THROTTLEWARN  0xD4  
-#define AUDIO_BATTERYWARN   0xD5  
-#define AUDIO_KEYTONE       0xD6
-#define AUDIO_SWITCHMOVED   0xD7
+// Pins 
 
+#define PIN_LCD_BACKLIGHT   6
+#define PIN_BUZZER          9
+
+#define PIN_SWC_LOWER_POS   A5
+#define PIN_SWC_UPPER_POS   A4 
+#define PIN_SWE             A3
+#define PIN_SWF             A2
+
+#define PIN_POWER_OFF_SENSE A1
+#define PIN_POWER_LATCH     A0
+
+//--------------- Freq allocation --------------------
+
+/* LPD433 Band ITU region 1
+The frequencies in this UHF band lie between 433.05Mhz and 434.790Mhz with 25kHz separation for a
+total of 69 freq channels. Channel_1 is 433.075 Mhz and Channel_69 is 434.775Mhz. 
+All our communications have to occur on any of these 69 channels. 
+*/
+
+/* Frequency list to pick from. The separation here is 300kHz (250kHz total lora bw + 
+50kHz guard band.*/
+uint32_t freqList[] = {433175000, 433475000, 433775000, 434075000, 434375000, 434675000};
+
+uint8_t fhss_schema[3] = {0, 1, 2}; /* Index in freqList. Frequencies to use for hopping. 
+These are changed when we receive a bind command from the master mcu. This schema also gets stored 
+to eeprom so we don't have to rebind each time we switch on the transmitter. */
+
+uint8_t idx_fhss_schema = 0; 
+
+//-------------- EEprom stuff --------------------
+#define EE_INITFLAG         0xBB 
+#define EE_ADR_INIT_FLAG    0
+#define EE_ADR_TX_ID        1
+#define EE_ADR_RX_ID        2
+#define EE_ADR_FHSS_SCHEMA  3
+
+//-------------- Audio ---------------------------
+enum{  
+  AUDIO_NONE = 0, 
+  
+  AUDIO_BATTERYWARN, 
+  AUDIO_THROTTLEWARN, 
+  AUDIO_TIMERELAPSED, 
+  AUDIO_INACTIVITY, 
+  AUDIO_TELEMWARN,
+  AUDIO_BIND_SUCCESS,
+  AUDIO_TRIM_AIL, 
+  AUDIO_TRIM_ELE, 
+  AUDIO_TRIM_THR, 
+  AUDIO_TRIM_RUD,
+  AUDIO_TRIM_MOVED,
+  AUDIO_TRIM_MODE_ENTERED,
+  AUDIO_TRIM_MODE_EXITED,
+  
+  AUDIO_SWITCHMOVED,
+  
+  AUDIO_KEYTONE
+};
 
 uint8_t audioToPlay = AUDIO_NONE;
-uint8_t lastAudioToPlay = AUDIO_NONE;
 
 //Sounds in rtttl format
-const char* battLowSound = "battlow2:d=4,o=5,b=290:4c6,32p,4a#,32p,4g.";
-const char* warnSound = "warn:d=4,o=4,b=160:4b5";
-const char* shortBeepSound = "shortBeep:d=4,o=4,b=250:16c#7";
-const char* timerElapsedSound = "timerElapsed:d=4,o=5,b=210:16b6,16p,8b6";
+const char* battLowSound = "txbattlow:d=4,o=5,b=290:4p,4c6,32p,4a#,32p,4g.";
+const char* warnSound = "warn:d=4,o=4,b=160:4e5";
+const char* shortBeepSound = "shortBeep:d=4,o=4,b=250:16d5";
+const char* timerElapsedSound = "timerElapsed:d=4,o=5,b=210:16p,16b6,16p,8b6";
+const char* trimAilSound = "ail:d=4,o=4,b=160:16a5";
+const char* trimEleSound = "ele:d=4,o=4,b=160:16b5";
+const char* trimThrSound = "thr:d=4,o=4,b=160:16c6";
+const char* trimRudSound = "rud:d=4,o=4,b=160:16d6";
+const char* inactivitySound = "idle:d=4,o=5,b=100:8p,32c5,32g4,32c5"; 
+const char* telemWarnSound = "telemWarn:d=4,o=5,b=90:8p,8a#4";
+const char* bindSound = "bind:d=4,o=5,b=75:32d#5,32g5,32a#5,16d6";
+const char* trimEnteredSound = "trimEnter:d=4,o=5,b=120:32d#5,32g5,32a5";
+const char* trimExitedSound = "trimExit:d=4,o=5,b=120:32a5,32g5,32d#5";
+const char* trimMovedSound = "trimMove:d=4,o=4,b=250:16a#7";
 
-//-----------------------------------------
-uint8_t radioPacketsPerSecond;
-unsigned long packetsPerSecPrevCalcTime = 0;
-unsigned long radioTotalPackets = 0;
-unsigned long prevradioTotalPackets = 0;
+
+//------------------------------------------------
+
+#define MAX_PACKET_SIZE  19
+uint8_t packet[MAX_PACKET_SIZE];
+
+enum{
+  PAC_BIND                   = 0x0,
+  PAC_ACK_BIND               = 0x1,
+  PAC_READ_OUTPUT_CH_CONFIG  = 0x2,
+  PAC_SET_OUTPUT_CH_CONFIG   = 0x3,
+  PAC_ACK_OUTPUT_CH_CONFIG   = 0x4,
+  PAC_RC_DATA                = 0x5,
+  PAC_TELEMETRY              = 0x6,
+};
+
+uint8_t transmitterID = 0; //set on bind
+
+uint8_t receiverID = 0;
+
+bool radioInitialised = false;
+unsigned long totalPacketsSent = 0;
+
+bool isRequestingBind = false;
+
+uint8_t bindStatusCode = 0; //1 on success, 2 on fail
+
+bool rfEnabled = false;
+
+uint8_t idxRFPowerLevel = 0;
+
+bool isFailsafeData = false;
+
+bool isReadOutputChConfig = false;
+bool isSetOutputChConfig = false;
+
+bool hasPendingRCData = false;
+uint16_t ch1to9[9];
+
+enum {
+  MODE_BIND, 
+  MODE_RC_DATA, 
+  MODE_GET_TELEM,
+  MODE_GET_RECEIVER_CONFIG,
+  MODE_SEND_RECEIVER_CONFIG
+};
+uint8_t operatingMode = MODE_RC_DATA;
+
+bool requestPoweroff = false;
+
+uint8_t outputChConfig[9];
+bool gotOutputChConfig = false;
+
+uint8_t receiverConfigStatusCode = 0; //1 on success, 2 on fail
+
+unsigned long telemModeEntryTime = 0;
+
+#define TIMEOUT_MODE_GET_TELEM   25
+
+bool isRequestingTelemetry = false; 
+
+uint8_t receiverPacketRate = 0;
+
+uint16_t telem_volts = 0x0FFF;  // in 10mV, sent by receiver with 12bits.  0x0FFF "No data"
 
 
-//-------------------Pins---------------------
-const int buzzerPin = 9;
-const int lcdBacklightPin = 6;
-const int SwCUpperPosPin = A4; //3pos switch
-const int SwCLowerPosPin = A5; //3pos switch
-
-//-----------------3pos switch states-----------
-enum {SWUPPERPOS = 2, SWMIDPOS = 0, SWLOWERPOS = 1};
-uint8_t SwCState = SWUPPERPOS; 
-
+void doSerialCommunication();
+void readPowerSwitch();
+void powerOff();
+void playTones();
+void doRfCommunication();
+void hop();
+void bind();
+void transmitRCdata();
+void transmitReceiverConfig();
+void getReceiverConfig();
+uint8_t buildPacket(uint8_t srcID, uint8_t destID, uint8_t dataIdentifier, uint8_t *dataBuff, uint8_t dataLen);
+bool checkPacket(uint8_t srcID, uint8_t destID, uint8_t dataIdentifier, uint8_t *packetBuff, uint8_t packetSize);
 
 //==================================================================================================
+
 void setup()
 {
-  memset(receivedData, 0, sizeof(receivedData)); //Clear this array to prevent unexpected results
-
-  pinMode(lcdBacklightPin,  OUTPUT);
-  pinMode(buzzerPin,  OUTPUT);
+  pinMode(PIN_POWER_LATCH, OUTPUT);
+  digitalWrite(PIN_POWER_LATCH, HIGH);
   
-  pinMode(SwCUpperPosPin, INPUT_PULLUP);
-  pinMode(SwCLowerPosPin, INPUT_PULLUP);
+  pinMode(PIN_POWER_OFF_SENSE, INPUT);
   
-
-  Serial.begin(115200);
-  delay(500);
-
-
-
-  /// Override the default CS, reset, and IRQ pins (optional)
-  LoRa.setPins(10, 8, 2); //pin 2 actually not used unless we have a callback 
-
-  if (LoRa.begin(433E6))
+  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+  digitalWrite(PIN_LCD_BACKLIGHT, HIGH);
+  
+  pinMode(PIN_BUZZER, OUTPUT);
+  
+  pinMode(PIN_SWC_UPPER_POS, INPUT_PULLUP);
+  pinMode(PIN_SWC_LOWER_POS, INPUT_PULLUP);
+  pinMode(PIN_SWF, INPUT_PULLUP);
+  pinMode(PIN_SWE, INPUT_PULLUP);
+  
+  // EEPROM init
+  if (EEPROM.read(EE_ADR_INIT_FLAG) != EE_INITFLAG)
   {
-    LoRa.setSpreadingFactor(7); //default is 7
+    EEPROM.write(EE_ADR_TX_ID, transmitterID);
+    EEPROM.write(EE_ADR_RX_ID, receiverID);
+    EEPROM.put(EE_ADR_FHSS_SCHEMA, fhss_schema);
+    EEPROM.write(EE_ADR_INIT_FLAG, EE_INITFLAG);
+  }
   
-    LoRa.setSignalBandwidth(250E3);
-    // signalBandwidth - signal bandwidth in Hz, defaults to 125E3.
-    // Supported values are 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3.
-    
+  // Read from EEPROM
+  transmitterID = EEPROM.read(EE_ADR_TX_ID);
+  receiverID = EEPROM.read(EE_ADR_RX_ID);
+  EEPROM.get(EE_ADR_FHSS_SCHEMA, fhss_schema);
+  
+  //init serial port
+  Serial.begin(115200);
+  delay(200);
+  
+  //setup lora module
+  LoRa.setPins(10, 8); 
+  if (LoRa.begin(freqList[0]))
+  {
+    LoRa.setSpreadingFactor(7); 
     LoRa.setCodingRate4(5);
-    /*codingRateDenominator - denominator of the coding rate, defaults to 5
-    Supported values are between 5 and 8, these correspond to coding rates of 4/5 and 4/8. 
-    The coding rate numerator is fixed at 4. */
-  
+    LoRa.setSignalBandwidth(250E3);
     radioInitialised = true;
   }
   else
     radioInitialised = false;
-
-  //other initialisations
-  lastValidMsgRcvTime = millis();
+  
 }
 
 //========================================= MAIN ==================================================
 void loop()
 {
-  /// ---------- READ THE 3 POSITION SWITCH ---------------
-  SwCState = ((!digitalRead(SwCUpperPosPin) << 1) | !digitalRead(SwCLowerPosPin)) & 0x03;
-  //state is sent after reading serial data
- 
+  /// ---------- SERIAL COMMUNICATIONS -----------------
+  doSerialCommunication();
+
+  ///----------- PLAY TONES -------------------------------
+  playTones();
+
+  ///----------- RF COMMUNICATIONS ------------------------
+  doRfCommunication();
+
+}
+
+//==================================================================================================
+
+void doSerialCommunication()
+{
+  /* 
+    MASTER MCU TO SLAVE MCU COMMUNICATION  
+    
+    - The transmit length is always fixed at 24 bytes.
+    - General format is as below.
+    ---------------------------------------------------------------
+      Description |  Status0  Status1   Audio   Data       CRC8
+      Size        |  1 byte    1 byte   1 byte  20 bytes   1 byte
+      Offset      |  0         1        2       3          23
+    ---------------------------------------------------------------
+  */
+
+  /* Status0 
+      bit0-2 RF power level
+      bit3   RF enabled
+      bit4   Backlight
+      bit5   Power off
+  */
   
-  /// ---------- READ THE SERIAL DATA ---------------------
-  getSerialData();
+  /* Status1
+      bit0  failsafe data
+      bit1  write receiver config
+      bit2  get receiver config 
+      bit3  get telemetry
+      bit4  enter bind mode 
+  */
 
-  ///----------- CONTROL LCD BACKLIGHT --------------------
-  if (receivedData[27] == 0xCA)
-    digitalWrite(lcdBacklightPin, HIGH);
-  else if (receivedData[27] == 0xCB)
-    digitalWrite(lcdBacklightPin, LOW);
 
-
-  /// ---------- TRANSMIT VIA RF MODULE --------------------
-  uint8_t rfStatus = receivedData[29];
-  static unsigned long lastValidMsgCount = 0;
-  if (radioInitialised == true && rfStatus == RF_ENABLED && validMsgCount > lastValidMsgCount)
+  ///--------- CHECK IF READY ------------------
+  const uint8_t msgLength = 24;
+  if (Serial.available() < msgLength)
   {
-    encodeDataToTransmit();
+    return;
+  }
+  
+  /// -------- READ INTO TEMP BUFFER ------------
+  
+  uint8_t tmpBuff[msgLength]; 
 
-    if (LoRa.beginPacket()) //Returns 1 if radio is ready to transmit, 0 if busy or on failure.
+  uint8_t cntr = 0;
+  while (Serial.available() > 0)
+  {
+    if (cntr < msgLength) 
     {
-      LoRa.write(dataToTransmit, 12);
-      if (LoRa.endPacket()) //Returns 1 on success, 0 on failure.
-      {
-        lastValidMsgCount = validMsgCount;
-        radioTotalPackets++;
-      }
+      tmpBuff[cntr] = Serial.read();
+      cntr++;
+    }
+    else //Discard any extra data
+      Serial.read();
+  }
+  
+  ///------ CHECK CRC ---------------------------
+  if(tmpBuff[msgLength - 1] != crc8Maxim(tmpBuff, msgLength - 1))
+  {
+    return;
+  }
+  
+  ///------ EXTRACT -----------------------------
+  
+  //--- status byte 0 ---
+ 
+  uint8_t status0 = tmpBuff[0];
+  
+  idxRFPowerLevel = status0 & 0x07;
+  
+  rfEnabled = (status0 >> 3) & 0x01; 
+  
+  digitalWrite(PIN_LCD_BACKLIGHT, (status0 >> 4) & 0x01);
+  
+  if((status0 >> 5) & 0x01)
+    powerOff();
+  
+  //--- status byte 1 ---
+  
+  uint8_t status1 = tmpBuff[1];
+
+  if((status1 >> 4) & 0x01)
+  {
+    isRequestingBind = true;
+  }
+  else if((status1 >> 2) & 0x01)
+  {
+    isReadOutputChConfig = true;
+  }
+  else if((status1 >> 1) & 0x01)
+  {
+    isSetOutputChConfig = true;
+    for(uint8_t i = 0; i < 9; i++)
+      outputChConfig[i] = tmpBuff[3 + i];
+  }
+  else
+  {
+    isFailsafeData = status1 & 0x01;
+    
+    uint8_t prevState_TelemetryRequest = isRequestingTelemetry;
+    isRequestingTelemetry = (status1 >> 3) & 0x01;
+    if(prevState_TelemetryRequest == 1) //skip this data
+      hasPendingRCData = false;
+    else
+    {
+      hasPendingRCData = true;
+      for(uint8_t i = 0; i < 9; i++)
+        ch1to9[i] = (uint16_t)tmpBuff[3 + i * 2] << 8 | (uint16_t)tmpBuff[4 + i * 2]; //combine every two bytes
     }
   }
+    
+
+  //--- audio ---
+  audioToPlay = tmpBuff[2]; 
+
+
+  /// ----------- REPLY TO MASTER MCU -------------
   
-  //-------------- Calculate packets per second --------------------
-  unsigned long ttElapsed = millis() - packetsPerSecPrevCalcTime;
+  /* 
+  SLAVE TO MASTER MCU SERIAL COMMUNICATION
+  
+  Byte0     Bit7     --> Got receiver channel configuration
+            Bit 6    --> Request poweroff
+            Bits 5,4 --> Bind status
+            Bit 3    --> SwF
+            Bit 2    --> SwE 
+            Bits 1,0 --> 3pos switch (SwC) state
+  
+  Byte1     Receiver config status code
+  Byte2     Transmitter packet rate
+  Byte3     Packet rate at receiver side
+  Byte4-5   Voltage telemetry
+  Byte6-14  Receiver channel config Ch1 to Ch9
+  Byte15    CRC8
+  */
+
+  //calc transmitted packets per second
+  static uint8_t txPktsPs = 0;
+  static unsigned long lastTotalPacketsSent = 0;
+  static unsigned long pktsPrevCalcMillis = 0;
+  unsigned long ttElapsed = millis() - pktsPrevCalcMillis;
   if (ttElapsed >= 1000)
   {
-    packetsPerSecPrevCalcTime = millis();
-
-    unsigned long _radioPktsPS = (radioTotalPackets - prevradioTotalPackets) * 1000;
-    _radioPktsPS /= ttElapsed;
-    radioPacketsPerSecond = uint8_t(_radioPktsPS);
-    prevradioTotalPackets = radioTotalPackets;
-    //packets per sec send to master on receiving data from master
+    pktsPrevCalcMillis = millis();
+    unsigned long pps = (totalPacketsSent - lastTotalPacketsSent) * 1000;
+    pps /= ttElapsed;
+    txPktsPs = pps & 0xFF;
+    lastTotalPacketsSent = totalPacketsSent;
   }
   
-  ///-------------------- Play any audio alerts ------------------------
-  audioToPlay = receivedData[30];
+  // read the 3 position switch. upperPos is 0, lowerPos is 1, midPos is 2
+  uint8_t swCState = 2;
+  if(!digitalRead(PIN_SWC_UPPER_POS)) 
+    swCState = 0;
+  else if(!digitalRead(PIN_SWC_LOWER_POS)) 
+    swCState = 1;
+  
+  //read SwE and SwF
+  bool swEEngaged = false;
+  if(!digitalRead(PIN_SWE))
+    swEEngaged = true;
+  bool swFEngaged = false;
+  if(!digitalRead(PIN_SWF)) 
+    swFEngaged = true;
+  
+  //get power switch state
+  readPowerSwitch();
+  
+  //send 
+  uint8_t dataToSend[16];
+  memset(dataToSend, 0, sizeof(dataToSend));
+  
+  dataToSend[0] |= (gotOutputChConfig & 0x01) << 7;
+  dataToSend[0] |= (requestPoweroff & 0x01) << 6;
+  dataToSend[0] |= (bindStatusCode & 0x03) << 4; 
+  dataToSend[0] |= (swFEngaged & 0x01) << 3;
+  dataToSend[0] |= (swEEngaged & 0x01) << 2;
+  dataToSend[0] |= swCState & 0x03;
+  
+  dataToSend[1] = receiverConfigStatusCode;
+  dataToSend[2] = txPktsPs;
+  dataToSend[3] = receiverPacketRate;
+  dataToSend[4] = (telem_volts >> 8) & 0xFF;
+  dataToSend[5] = telem_volts & 0xFF;
+  
+  for(uint8_t i = 0; i < 9; i++)
+    dataToSend[6 + i] = outputChConfig[i];
+  
+  dataToSend[15] = crc8Maxim(dataToSend, 15);
+  
+  Serial.write(dataToSend, sizeof(dataToSend));
+  
+  //reset flags
+  bindStatusCode = 0;
+  receiverConfigStatusCode = 0;
+  gotOutputChConfig = false;
+}
 
+//--------------------------------------------------------------------------------------------------
+
+void readPowerSwitch()
+{  
+  static bool switchTimerInitiated = false;
+  static uint32_t swStartTime = 0;
+  
+  requestPoweroff = false;
+  
+  if(digitalRead(PIN_POWER_OFF_SENSE) == HIGH)
+  {
+    if(!switchTimerInitiated)
+    {
+      swStartTime = millis();
+      switchTimerInitiated = true;
+    }
+    if(millis() - swStartTime > 500)
+      requestPoweroff = true;
+  }
+  else
+    switchTimerInitiated = false;
+}
+
+//--------------------------------------------------------------------------------------------------
+
+void powerOff()
+{
+  //stop LoRa module
+  if(radioInitialised)
+  {
+    while(LoRa.isTransmitting())
+    {    
+      delay(2);
+    }
+    LoRa.sleep();
+    delay(5);
+  }
+  
+  //pull power pin
+  pinMode(PIN_POWER_LATCH, INPUT);
+  while(1)
+  {
+  }
+}
+
+//==================================================================================================
+
+void playTones()
+{
+  static uint8_t lastAudioToPlay = AUDIO_NONE;
   if(audioToPlay != lastAudioToPlay) //init playback with the specified audio
   {
     lastAudioToPlay = audioToPlay;
     switch(audioToPlay)
     {
-      case AUDIO_THROTTLEWARN:   rtttl::begin(buzzerPin, warnSound); break;
-      case AUDIO_BATTERYWARN:    rtttl::begin(buzzerPin, battLowSound); break;
-      case AUDIO_TIMERELAPSED:   rtttl::begin(buzzerPin, timerElapsedSound); break;
-      case AUDIO_KEYTONE:        rtttl::begin(buzzerPin, shortBeepSound); break;
-      case AUDIO_SWITCHMOVED:    rtttl::begin(buzzerPin, shortBeepSound); break;
+      case AUDIO_THROTTLEWARN:   
+        rtttl::begin(PIN_BUZZER, warnSound); 
+        break;
+        
+      case AUDIO_BATTERYWARN:    
+        rtttl::begin(PIN_BUZZER, battLowSound); 
+        break;
+        
+      case AUDIO_TIMERELAPSED:   
+        rtttl::begin(PIN_BUZZER, timerElapsedSound); 
+        break;
+        
+      case AUDIO_KEYTONE: 
+      case AUDIO_SWITCHMOVED:    
+        rtttl::begin(PIN_BUZZER, shortBeepSound); 
+        break;
+        
+      case AUDIO_TRIM_AIL:
+        rtttl::begin(PIN_BUZZER, trimAilSound); 
+        break;
+        
+      case AUDIO_TRIM_ELE:
+        rtttl::begin(PIN_BUZZER, trimEleSound); 
+        break;
+        
+      case AUDIO_TRIM_THR:
+        rtttl::begin(PIN_BUZZER, trimThrSound); 
+        break;
+        
+      case AUDIO_TRIM_RUD:
+        rtttl::begin(PIN_BUZZER, trimRudSound); 
+        break;
+        
+      case AUDIO_INACTIVITY:
+        rtttl::begin(PIN_BUZZER, inactivitySound);
+        break;
+        
+      case AUDIO_TELEMWARN:
+        rtttl::begin(PIN_BUZZER, telemWarnSound);
+        break;
+        
+      case AUDIO_BIND_SUCCESS:
+        rtttl::begin(PIN_BUZZER, bindSound);
+        break;
+        
+      case AUDIO_TRIM_MOVED:
+        rtttl::begin(PIN_BUZZER, trimMovedSound);
+        break;
+        
+      case AUDIO_TRIM_MODE_ENTERED:
+        rtttl::begin(PIN_BUZZER, trimEnteredSound);
+        break;
+        
+      case AUDIO_TRIM_MODE_EXITED:
+        rtttl::begin(PIN_BUZZER, trimExitedSound);
+        break;
     }
   }
-  else //Playback. Playback will automatically stop once all notes have been played
-  {
+  else //Playback. Automatically stops once all notes have been played
     rtttl::play();
-  }
 }
 
 //==================================================================================================
-void getSerialData()
+
+void doRfCommunication()
 {
-  //Reads the incoming serial data into receivedData[]
-  /* Master to Slave MCU communication format as below
-
-  - Start byte 0xBB (0d187)
-  
-  - Channel 1 to 8 data (2bytes per channel, total 16 bytes). 0b0LLLLLLL 0b0HHHHHHH
-  
-  - Channel 9 to 10 data (1 byte per channel, total 2 bytes)
-  
-  - Channe1 1 to 8 failsafes (1byte each, 8 bytes total)
-
-  - Backlight status (1 byte) 0d202 on, 0d203 off
-  - Battery status (1 byte) 0d204 healthy, 0d205 low
-  - RF status (1 byte) 0d206 on, 0d207 off
-  - Audio tone to play (1 byte)
-  
-  - Stop byte 0xDD (0d221)
-  */
-
-  //Read in new message
-  /*Here, we need to first check how many bytes are available in serial buffer. If nothing, we exit.
-    If the number of available bytes is less than we are expecting (but not zero), then we have to
-    wait a little probably because the incoming byte stream is not yet fully arrived.
-    We then read everything from the Serial buffer  */
-
-  int numBytesSer = Serial.available();
-  if (numBytesSer == 0)
+  if(!radioInitialised)
   {
     return;
   }
-
-  if (numBytesSer > 0 && numBytesSer < msgLength)
-    delay(3); /* 115200 baud is about 11520 bytes/s. 32 bytes takes about 3ms */
-
-  uint8_t tmpBuff[64];
-  memset(tmpBuff, 0, sizeof(tmpBuff)); //fill tmpBuff with zeros to prevent unpredictable results
-
-  bool tmpBuffIsFull = false;
-  unsigned int cntr = 0;
-
-  while (Serial.available() > 0)
+  
+  if(!LoRa.isTransmitting())
   {
-    if (tmpBuffIsFull == false) //put data into tmpBuff
+    //--- set power level ---
+    
+    static uint8_t prevIdxRFPowerLevel = 0xFF;
+    if(idxRFPowerLevel != prevIdxRFPowerLevel)
     {
-      tmpBuff[cntr] = Serial.read();
-      cntr += 1;
-      if (cntr >= (sizeof(tmpBuff) / sizeof(tmpBuff[0]))) //prevent array out of bounds
-        tmpBuffIsFull = true;
+      prevIdxRFPowerLevel = idxRFPowerLevel;
+      uint8_t power_dBm[5] = {3, 7, 10, 14, 17}; //2mW, 5mW, 10mW, 25mW, 50mW
+      LoRa.sleep();
+      LoRa.setTxPower(power_dBm[idxRFPowerLevel]);
+      LoRa.idle();
     }
-    else //Throw away any extra data
-      Serial.read();
+    
+    //--- Change modes ---
+    if(isRequestingBind)
+    {
+      operatingMode = MODE_BIND;
+      isRequestingBind = false;
+    }
+    else if(isReadOutputChConfig && operatingMode != MODE_BIND)
+    {
+      operatingMode = MODE_GET_RECEIVER_CONFIG;
+      isReadOutputChConfig = false;
+    }
+    else if(isSetOutputChConfig && operatingMode != MODE_BIND)
+    {
+      operatingMode = MODE_SEND_RECEIVER_CONFIG;
+      isSetOutputChConfig = false;
+    }
+    else if(isRequestingTelemetry && operatingMode == MODE_RC_DATA && !hasPendingRCData)
+    {
+      operatingMode = MODE_GET_TELEM;
+      telemModeEntryTime = millis();
+    }
   }
 
-  //-------- Check for fisrt occurence of start and stop bytes in tmpBuff ---------
-  int startByteIndex = 0, stopByteIndex = 0;
-  for (unsigned int i = 0; i < (sizeof(tmpBuff) / sizeof(tmpBuff[0])); i += 1)
+  //state machine
+  switch (operatingMode)
   {
-    if (tmpBuff[i] == 0xBB)
-      startByteIndex = i;
-    else if (tmpBuff[i] == 0xDD)
-    {
-      stopByteIndex = i;
+    case MODE_BIND:
+      bind();
       break;
+      
+    case MODE_GET_RECEIVER_CONFIG:
+      getReceiverConfig();
+      break;
+      
+    case MODE_SEND_RECEIVER_CONFIG:
+      transmitReceiverConfig();
+      break;
+      
+    case MODE_RC_DATA:
+      transmitRCdata();
+      break;
+      
+    case MODE_GET_TELEM:
+      getTelemetry();
+      if(millis() - telemModeEntryTime > TIMEOUT_MODE_GET_TELEM)
+      {
+        hop();
+        operatingMode = MODE_RC_DATA;
+      }
+      break;
+  }
+
+}
+
+//--------------------------------------------------------------------------------------------------
+
+void hop()
+{
+  idx_fhss_schema++;
+  if(idx_fhss_schema >= sizeof(fhss_schema)/sizeof(fhss_schema[0]))
+    idx_fhss_schema = 0;
+  
+  uint8_t idx_freq = fhss_schema[idx_fhss_schema];
+  if(idx_freq < sizeof(freqList)/sizeof(freqList[0])) //prevents invalid references
+  {
+    LoRa.sleep();
+    LoRa.setFrequency(freqList[idx_freq]);
+    LoRa.idle();
+  }
+}
+
+//--------------------------------------------------------------------------------------------------
+
+void bind()
+{
+  static bool bindInitialised = false;
+  static bool transmitInitiated = false;
+
+  static unsigned long bindModeEntryTime = 0;
+  static unsigned long bindAckEntryTime = 0;
+  
+  static bool isListeningForAck = false;
+  
+  #define TIMEOUT_MODE_BIND  4000 
+  #define TIMEOUT_BIND_ACK   100  //Max time waiting for receiver's ack before retransmission
+  
+  /// INITIALISE
+  if(!bindInitialised)
+  {
+    bindModeEntryTime = millis();
+
+    //--- generate random transmitterID and fhss_schema
+    
+    randomSeed(millis()); //Seed PRNG
+    
+    transmitterID = random(0x01, 0xFF);
+    
+    memset(fhss_schema, 0xFF, sizeof(fhss_schema)); //clear schema
+    uint8_t idx = 0;
+    while (idx < sizeof(fhss_schema)/sizeof(fhss_schema[0]))
+    {
+      uint8_t genVal = random(sizeof(freqList)/sizeof(freqList[0]));
+      //check uniqueness
+      bool unique = true;
+      for(uint8_t k = 0; k < (sizeof(fhss_schema)/sizeof(fhss_schema[0])); k++)
+      {
+        if(genVal == fhss_schema[k]) //not unique
+        {
+          unique = false;
+          break; //exit for loop
+        }
+      }
+      if(unique)
+      {
+        fhss_schema[idx] = genVal; //add to fhss_schema
+        idx++; //increment index
+      }
+    }
+
+    //--- set to bind frequency
+    LoRa.sleep();
+    LoRa.setFrequency(freqList[0]);
+    LoRa.idle();
+    
+    bindInitialised = true;
+  }
+  
+  ///START TRANSMIT
+  if(bindInitialised && !isListeningForAck && !transmitInitiated)
+  {
+    if(LoRa.beginPacket())
+    {
+      uint8_t _packetLen = buildPacket(transmitterID, 0x00, PAC_BIND, fhss_schema, sizeof(fhss_schema)/sizeof(fhss_schema[0]));
+      LoRa.write(packet, _packetLen);
+      LoRa.endPacket(true); //non-blocking
+      delay(1);
+      transmitInitiated = true;
     }
   }
-
-  //--------Copy to receivedData[] if the data received is good. Also send back pkts/sec----
-  if ((stopByteIndex - startByteIndex + 1) == msgLength)
+  
+  /// ON DONE TRANSMIT, LISTEN FOR REPLY OR TIMEOUT 
+  if(!LoRa.isTransmitting())
   {
-    validMsgCount++;
-    lastValidMsgRcvTime = millis();
-    for (int i = 0; i < msgLength; i += 1)
-      receivedData[i] = tmpBuff[i];
+    if(!isListeningForAck)
+    {
+      isListeningForAck = true;
+      bindAckEntryTime = millis();
+    }
     
-    //send back packets per sec and 3pos switch state
-    uint8_t returnByte = (radioPacketsPerSecond & 0x3F) | ((SwCState << 6) & 0xC0);
-    Serial.write(returnByte); 
+    int packetSize = LoRa.parsePacket();
+    if (packetSize > 0) //received a packet
+    {
+      uint8_t msgBuff[30];
+      memset(msgBuff, 0, sizeof(msgBuff));
+      uint8_t cntr = 0;
+      while (LoRa.available() > 0) 
+      {
+        if(cntr < (sizeof(msgBuff)/sizeof(msgBuff[0])))
+        {
+          msgBuff[cntr] = LoRa.read();
+          cntr++;
+        }
+        else // discard any extra data
+          LoRa.read(); 
+      }
+      // Check if the packet is valid and extract the data
+      if(checkPacket(0x00, transmitterID, PAC_ACK_BIND, msgBuff, packetSize))
+      {
+        //check length of data and receiverID range
+        if((msgBuff[2] & 0x0F) == 1 && msgBuff[3] > 0x00)
+        {
+          bindStatusCode = 1; //bind success
+          receiverID = msgBuff[3];
+          
+          //Save to eeprom
+          EEPROM.write(EE_ADR_TX_ID, transmitterID);
+          EEPROM.write(EE_ADR_RX_ID, receiverID);
+          EEPROM.put(EE_ADR_FHSS_SCHEMA, fhss_schema);
+          
+          //clear flags
+          bindInitialised = false;
+          isListeningForAck = false;
+          transmitInitiated = false;
+          
+          hop();
+          operatingMode = MODE_RC_DATA;
+          
+          return;
+        }
+      }
+    }
+    
+    if(isListeningForAck && millis() - bindAckEntryTime > TIMEOUT_BIND_ACK) //timeout of ack
+    {
+      transmitInitiated = false;
+      isListeningForAck = false;
+    }
+    
+    if(millis() - bindModeEntryTime > TIMEOUT_MODE_BIND) //timeout of bind
+    {
+      bindStatusCode = 2; //bind failed
+      
+      //restore so that we don't unintentionally unbind a bound receiver
+      transmitterID = EEPROM.read(EE_ADR_TX_ID);
+      receiverID = EEPROM.read(EE_ADR_RX_ID);
+      EEPROM.get(EE_ADR_FHSS_SCHEMA, fhss_schema);
+      
+      //clear flags
+      bindInitialised = false;
+      isListeningForAck = false;
+      transmitInitiated = false;
+      
+      hop();
+      operatingMode = MODE_RC_DATA;
+      
+      return;
+    }
+
   }
 }
 
-//==================================================================================================
-uint16_t combineBytes(uint8_t _byte1, uint8_t _byte2)
+//--------------------------------------------------------------------------------------------------
+
+void transmitRCdata()
 {
-  uint16_t qq;
-  qq = (uint16_t) _byte2;
-  qq <<= 7;
-  qq |= (uint16_t) _byte1;
-  return qq;
+  if(!hasPendingRCData)
+    return;
+  
+  static bool transmitInitiated = false;
+  static bool hopPending = false;
+  
+  if(!rfEnabled) //don't send anything
+  {
+    transmitInitiated = false;
+    hopPending = false;
+    hasPendingRCData = false;
+    
+    return;
+  }
+
+  /// START TRANSMIT
+  if(!transmitInitiated) 
+  {
+    //encode  
+    uint8_t dataToSend[12];
+    memset(dataToSend, 0, sizeof(dataToSend));
+    
+    dataToSend[0]  = (ch1to9[0] >> 2) & 0xFF;
+    dataToSend[1]  = (ch1to9[0] << 6 | ch1to9[1] >> 4) & 0xFF;
+    dataToSend[2]  = (ch1to9[1] << 4 | ch1to9[2] >> 6) & 0xFF;
+    dataToSend[3]  = (ch1to9[2] << 2 | ch1to9[3] >> 8) & 0xFF;
+    dataToSend[4]  = ch1to9[3] & 0xFF;
+    
+    dataToSend[5]  = (ch1to9[4] >> 2) & 0xFF;
+    dataToSend[6]  = (ch1to9[4] << 6 | ch1to9[5] >> 4) & 0xFF;
+    dataToSend[7]  = (ch1to9[5] << 4 | ch1to9[6] >> 6) & 0xFF;
+    dataToSend[8]  = (ch1to9[6] << 2 | ch1to9[7] >> 8) & 0xFF;
+    dataToSend[9] = ch1to9[7] & 0xFF;
+    
+    dataToSend[10] = (ch1to9[8] >> 2) & 0xFF;
+    dataToSend[11] = (ch1to9[8] << 6) & 0xC0;
+    
+    dataToSend[11] |= (isFailsafeData & 0x01) << 4;
+    dataToSend[11] |= (isRequestingTelemetry & 0x01) << 3;
+    dataToSend[11] |= idxRFPowerLevel & 0x07;
+
+    uint8_t _packetLen = buildPacket(transmitterID, receiverID, PAC_RC_DATA, dataToSend, sizeof(dataToSend));
+
+    if(LoRa.beginPacket())
+    {
+      LoRa.write(packet, _packetLen);
+      LoRa.endPacket(true); //async
+      delay(1);
+
+      transmitInitiated = true;
+      hopPending = true;
+      totalPacketsSent++;
+    }
+  }
+  
+  /// ON TRANSMIT DONE
+  if(!LoRa.isTransmitting())
+  {
+    hasPendingRCData = false;
+    transmitInitiated = false;
+    
+    if(hopPending)
+    {
+      hop();
+      hopPending = false;
+    }
+  }
 }
 
+//--------------------------------------------------------------------------------------------------
 
-//==================================================================================================
-void encodeDataToTransmit()
+void getReceiverConfig()
 {
-  // We encode the data into a more compact form
+  static bool transmitInitiated = false;
+  static bool isListeningForReply = false;
+  
+  static uint32_t listenEntryTime = 0;
+  const int maxListenTime = 40;
+  
+  static int retryCount = 0;
+  const int maxRetries  = 5 * sizeof(fhss_schema) / sizeof(fhss_schema[0]);
 
-  uint16_t ch1to8[8];
-  for (int i = 0; i < 8; i += 1)
-    ch1to8[i] = combineBytes(receivedData[1 + i*2], receivedData[2 + i*2]);
-
-  /** Air protocol format
-     Chs 1 to 8 encoded as 10 bits
-
-     byte  b0       b1      b2        b3       b4       
-        11111111 11222222 22223333 33333344 44444444 
-        
-           b5       b6      b7        b8       b9
-        55555555 55666666 66667777 77777788 88888888
-
-           b10      b11
-        abfCCCCC   CCCCCCCC
-        
-     a is digital ch9, b digital Ch10,  f is failsafe flag
-     
-     CCCCC CCCCCCCC is the 13 bit CRC (calculated as CRC16)   
-  */
-
-  //Send Fail safe every 2 secs
-  dataToTransmit[10] = 0x00;
-  static unsigned long fsLastms = 0;
-  if (millis() - fsLastms >= 2000)
+  //Start transmit
+  if(!transmitInitiated)
   {
-    fsLastms = millis();
-    dataToTransmit[10] = 0x20; //failsafe bit
-    
-    //Replace channel values by failsafes
-    //if failsafe is off, set to 1023 (1111111111)
-    for(int i=0; i<8; i++)
+    uint8_t _packetLen = buildPacket(transmitterID, receiverID, PAC_READ_OUTPUT_CH_CONFIG, NULL, 0);
+    if(LoRa.beginPacket())
     {
-      if(receivedData[19+i] == 0)
-        ch1to8[i] = 1023;
-      else
+      LoRa.write(packet, _packetLen);
+      LoRa.endPacket(true); //async
+      delay(1);
+
+      transmitInitiated = true;
+    }
+  }
+  
+  //On transmit done, listen for reply
+  if(!LoRa.isTransmitting())
+  {
+    if(!isListeningForReply)
+    {
+      hop();
+      isListeningForReply = true;
+      listenEntryTime = millis();
+    }
+    
+    int packetSize = LoRa.parsePacket();
+    if (packetSize > 0) //received a packet
+    {
+      uint8_t msgBuff[30];
+      memset(msgBuff, 0, sizeof(msgBuff));
+      uint8_t cntr = 0;
+      while (LoRa.available() > 0) 
       {
-        ch1to8[i] = receivedData[19 + i] - 1;
-        ch1to8[i] *= 5;
+        if(cntr < (sizeof(msgBuff)/sizeof(msgBuff[0])))
+        {
+          msgBuff[cntr] = LoRa.read();
+          cntr++;
+        }
+        else // discard any extra data
+          LoRa.read(); 
+      }
+      
+      hop();
+      
+      //Check if packet is valid and extract the data
+      if(checkPacket(receiverID, transmitterID, PAC_READ_OUTPUT_CH_CONFIG, msgBuff, packetSize))
+      {
+        //check length
+        if((msgBuff[2] & 0x0F) == 9) //9 bytes
+        {
+          gotOutputChConfig = true;
+          for(uint8_t i = 0; i < 9; i++)
+            outputChConfig[i] = msgBuff[3 + i];
+          
+          //Change mode
+          operatingMode = MODE_RC_DATA;
+          
+          //reset
+          isListeningForReply = false;
+          transmitInitiated = false;
+          retryCount = 0;
+          
+          //exit
+          return;
+        }
+      }
+    }
+    
+    //Retry if nothing was received
+    if(isListeningForReply && (millis() - listenEntryTime) > maxListenTime)
+    {
+      isListeningForReply = false;
+      transmitInitiated = false;
+      ++retryCount;
+      if(retryCount > maxRetries) //timeout
+      {
+        retryCount = 0;
+        operatingMode = MODE_RC_DATA;
+        hop();
       }
     }
   }
+}
 
-  //Encode
+//--------------------------------------------------------------------------------------------------
+
+void transmitReceiverConfig()
+{
+  static bool transmitInitiated = false;
+  static bool isListeningForReply = false;
   
-  dataToTransmit[0]  = (ch1to8[0] >> 2) & 0xFF;
-  dataToTransmit[1]  = (ch1to8[0] << 6 | ch1to8[1] >> 4) & 0xFF;
-  dataToTransmit[2]  = (ch1to8[1] << 4 | ch1to8[2] >> 6) & 0xFF;
-  dataToTransmit[3]  = (ch1to8[2] << 2 | ch1to8[3] >> 8) & 0xFF;
-  dataToTransmit[4]  = ch1to8[3] & 0xFF;
+  static uint32_t listenEntryTime = 0;
+  const int maxListenTime = 40;
   
-  dataToTransmit[5]  = (ch1to8[4] >> 2) & 0xFF;
-  dataToTransmit[6]  = (ch1to8[4] << 6 | ch1to8[5] >> 4) & 0xFF;
-  dataToTransmit[7]  = (ch1to8[5] << 4 | ch1to8[6] >> 6) & 0xFF;
-  dataToTransmit[8]  = (ch1to8[6] << 2 | ch1to8[7] >> 8) & 0xFF;
-  dataToTransmit[9]  = ch1to8[7] & 0xFF;
+  static int retryCount = 0;
+  const int maxRetries  = 5 * sizeof(fhss_schema) / sizeof(fhss_schema[0]);
+
+  //Start transmit
+  if(!transmitInitiated)
+  {
+    uint8_t _packetLen = buildPacket(transmitterID, receiverID, PAC_SET_OUTPUT_CH_CONFIG, outputChConfig, sizeof(outputChConfig));
+    if(LoRa.beginPacket())
+    {
+      LoRa.write(packet, _packetLen);
+      LoRa.endPacket(true); //async
+      delay(1);
+
+      transmitInitiated = true;
+    }
+  }
   
-  dataToTransmit[10] |= (receivedData[17] & 0x01) << 7; //digitalChA bit
-  dataToTransmit[10] |= (receivedData[18] & 0x01) << 6; //digitalChB bit
+  //On transmit done, listen for reply
+  if(!LoRa.isTransmitting())
+  {
+    if(!isListeningForReply)
+    {
+      hop();
+      isListeningForReply = true;
+      listenEntryTime = millis();
+    }
+    
+    int packetSize = LoRa.parsePacket();
+    if (packetSize > 0) //received a packet
+    {
+      uint8_t msgBuff[30];
+      memset(msgBuff, 0, sizeof(msgBuff));
+      uint8_t cntr = 0;
+      while (LoRa.available() > 0) 
+      {
+        if(cntr < (sizeof(msgBuff)/sizeof(msgBuff[0])))
+        {
+          msgBuff[cntr] = LoRa.read();
+          cntr++;
+        }
+        else // discard any extra data
+          LoRa.read(); 
+      }
+      
+      hop();
+      
+      //Check if packet is valid and extract the data
+      if(checkPacket(receiverID, transmitterID, PAC_ACK_OUTPUT_CH_CONFIG, msgBuff, packetSize))
+      {
+        //indicate success
+        receiverConfigStatusCode = 1;
+        
+        //Change mode
+        operatingMode = MODE_RC_DATA;
+        
+        //reset
+        isListeningForReply = false;
+        transmitInitiated = false;
+        retryCount = 0;
+        
+        //exit
+        return;
+      }
+    }
+    
+    //Retry if nothing was received
+    if(isListeningForReply && (millis() - listenEntryTime) > maxListenTime)
+    {
+      isListeningForReply = false;
+      transmitInitiated = false;
+      ++retryCount;
+      if(retryCount > maxRetries) //timeout
+      {
+        retryCount = 0;
+        //indicate a failure
+        receiverConfigStatusCode = 2;
+        
+        operatingMode = MODE_RC_DATA;
+        hop();
+      }
+    }
+  }
+}
+
+//--------------------------------------------------------------------------------------------------
+
+void getTelemetry()
+{
+  static unsigned long timeOfLastTelemReception = 0;
+
+  int packetSize = LoRa.parsePacket();
+  if (packetSize > 0) //received a packet
+  {
+    uint8_t msgBuff[30];
+    memset(msgBuff, 0, sizeof(msgBuff));
+    uint8_t cntr = 0;
+    while (LoRa.available() > 0) 
+    {
+      if(cntr < (sizeof(msgBuff)/sizeof(msgBuff[0])))
+      {
+        msgBuff[cntr] = LoRa.read();
+        cntr++;
+      }
+      else // discard any extra data
+        LoRa.read(); 
+    }
+    
+    hop();
+    
+    //Check if packet is valid and extract the data
+    if(checkPacket(receiverID, transmitterID, PAC_TELEMETRY, msgBuff, packetSize))
+    {
+      //check length
+      if((msgBuff[2] & 0x0F) == 3) //3 bytes
+      {
+        timeOfLastTelemReception = millis();
+        //extract
+        receiverPacketRate = msgBuff[3];
+        telem_volts = ((uint16_t)msgBuff[4] << 4 & 0xFF0) | ((uint16_t)msgBuff[5] >> 4 & 0x0F);
+      }
+    }
+    
+    //Change mode
+    operatingMode = MODE_RC_DATA;
+  }
+
+  //reset data if no telemetry received
+  if(millis() - timeOfLastTelemReception > 3000)
+  {
+    receiverPacketRate = 0;
+    telem_volts = 0x0FFF;
+  }
+}
+
+//--------------------------------------------------------------------------------------------------
+
+uint8_t buildPacket(uint8_t srcID, uint8_t destID, uint8_t dataIdentifier, uint8_t *dataBuff, uint8_t dataLen)
+{
+  // Builds packet and returns its length
   
-  uint16_t crcQQ = crc16(dataToTransmit, 11);
- 
-  dataToTransmit[10] |= ((crcQQ >> 8) & 0x1F);
-  dataToTransmit[11] = crcQQ & 0xFF;
+  packet[0] = srcID;
+  packet[1] = destID;
+  dataLen &= 0x0F; //limit
+  packet[2] = (dataIdentifier << 4) | dataLen;
+  for(uint8_t i = 0; i < dataLen; i++)
+  {
+    packet[3 + i] = *dataBuff;
+    ++dataBuff;
+  }
+  packet[3 + dataLen] = crc8Maxim(packet, 3 + dataLen);
+  return 4 + dataLen; 
+}
+
+//--------------------------------------------------------------------------------------------------
+
+bool checkPacket(uint8_t srcID, uint8_t destID, uint8_t dataIdentifier, uint8_t *packetBuff, uint8_t packetSize)
+{
+  if(packetSize < 4 || packetSize > 19) //packet may be from other Lora radios
+    return false;
+  
+  if(packetBuff[0] != srcID || packetBuff[1] != destID || (packetBuff[2] >> 4) != dataIdentifier)
+    return false;
+  
+  //check packet crc
+  uint8_t _crcQQ = packetBuff[packetSize - 1];
+  uint8_t _computedCRC = crc8Maxim(packetBuff, packetSize - 1);
+  if(_crcQQ != _computedCRC)
+    return false;
+  
+  return true;
 }

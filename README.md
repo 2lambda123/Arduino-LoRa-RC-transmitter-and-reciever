@@ -1,127 +1,89 @@
-# Arduino Lora based Radio Controller
+# Arduino Lora based RC system
+Control just about anything RC
 
-An Arduino powered long range radio controller for use with rc planes, cars, boats, etc.
+## Features
+- 9 RC channels. All channels are transmitted with 10 bit resolution
+- Configurable RC channel output signal. Servo PWM, Digital on-off, or 'normal' PWM
+- Reverse, Subtrim, Endpoints, Failsafe
+- Dual rates and expo for Ail, Ele, Rud
+- Throttle curve
+- Flexible mixer system
+- Adaptable timer and a stopwatch
+- Model memory. Create, delete, copy, rename, and reset models
+- Sticks calibration
+- Alarms, warnings
+- Adjustable RF power
+- Receiver binding
+- Frequency hopping
+- External voltage telemetry
+- Transmitter to receiver update rate up to 40x
 
-<p align="left">
-<img src="img1.jpg" width="622" height="759"/>
+## Hardware
+<p align="center">
+<img src="img1.jpg" width="785" height="560"/>
 </p>
 
-## Features:
-- 8 proportional channels with Reverse, Endpoints, Subtrim, Cut, Failsafe
-- 2 digital toggle channels
-- 5 model memory
-- Dualrate & expo for Ail, Ele, Rud
-- Throttle curve with 5 points
-- Safety (cut) switch
-- 10 free mixer slots per model
-- 2 timers; Throttle timer and free stopwatch
-- Sticks calibration
-- Audio beep feedback
-
-## License:
-[MIT license](https://choosealicense.com/licenses/mit/)
-
-## Hardware:
 #### Transmitter
 - 2x Atmega328p microcontrollers
-- 1x Semtech SX1276/77/78/79 based rf modules 
-- 128x64 KS0108 based LCD, or any 128x64 lcd (provide own driver code). See the schematics
+- 1x Semtech SX1276/77/78/79 based RF module 
+- 128x64 KS0108 based LCD, or any 128x64 LCD (provide own driver code).
+- 2x Joysticks, 5x two position switches, 1x three position switch, 1x potentiometer
 - 3x push buttons
-- Additional support components. See the schematics
-
-#### Receiver
-- 1x Atmega328p mcu
-- 1x Semtech SX1276/77/78/79 based rf module
 - Additional support components
 
-<p align="left">
-<img src="layout.jpg" width="691" height="649"/>
+#### Receiver
+- 1x Atmega328p microcontroller
+- 1x Semtech SX1276/77/78/79 based RF module
+- Additional support components
+
+The schematics can be found in the 'etc' folder under root directory
+
+## Compiling
+The code compiles on Arduino IDE 1.8.x or higher with board set to Arduino Uno. 
+<br>The transmitter code is in mtx (master mcu) and stx (slave mcu) folders. The receiver mcu code is in 
+the rx folder. No external libraries are required to compile.
+<br>I am using the 433MHz band with the SX1278 modules. If using other modules or frequency band, it is 
+necessary to edit the frequency lists in the stx.ino and rx.ino files. 
+
+## User Interface
+- Three buttons are used for navigation; Up, Select, Down. Long press Select to go Back. 
+- Holding the Up key on home screen accesses the trims.
+- Holding the Select key when booting opens the start-up menu (for stick recalibration, format eeprom, etc.)
+
+<p align="center">
+<img src="img2.png" width="828" height="1036"/>
 </p>
 
-## Firmware:
-The code compiles on Arduino IDE 1.8.9 and higher with board set to Arduino Uno. 
-The transmitter code is in mtx (master mcu) and stx (slave mcu) folders. The receiver mcu code is in the rx folder. No external libraries are required to compile.
+## Binding to a receiver 
+To bind the receiver and transmitter, use the bind option in the system setup screen. 
+Select bind option and restart the receiver. The LED in receiver blinks on successful bind.
 
-### User Interface
-Three buttons are used for navigation; Up, Select, Down. Long pressing Select in any screen acts as Back. 
-Long pressing up or down in mixer screen pops up a mixer context menu there. On homescreen, holding the Down key
-reveals the extra 2 digital channels (9 and 10).
+## Mixing
+This controller implements a free mixer that offers flexibility with what we want to control. 
+Each mixer slot takes two inputs, multiplexes them, and sends the result to the specified output. 
+Available multiplex options are Add, Multiply, Replace. We can also assign a switch to turn the mix on or off.
+Mixer slots are evaluated sequentially. 
+<br>
+<br> Mixer sources can be any of the following
+- Raw stick inputs (roll, pitch, thrt, yaw, knob)
+- Constants (max)
+- Switches (SwA, SwB, SwC, SwD, SwE, SwF)
+- Slowed input (appears with an asterisk)
+- Curves (Ail, Ele, Thrt, Rud)
+- Channels (Ch1 to Ch9)
+- Temporary variables (Virt1, Virt2)
 
-<p align="left">
-<img src="img2.png" width="1074" height="838"/>
-</p>
+The default mapping is Ail to Ch1, Ele to Ch2, Thrt to Ch3, Rud to Ch4, unless overridden in the mixer.
 
-### Example mixes:
+##### [Example mixes](mixer.md)
 
-#### Note:
-1. Default mapping is Ail->Ch1, Ele->Ch2, Thrt->Ch3, Rud->Ch4, unless overridden in mixer.
-2. In case after mix, the servos are moving in wrong direction, it can be solved by negating 
-  the applied weights, or reversing the servo direction in Outputs screen. 
+## Configuring RC channel outputs
+The receiver outputs can be configured from the transmitter to any of the three signal types; servo PWM, digital on-off, or 'normal' PWM.
+For instance 'normal' PWM output could be used to control brushed DC motors without complex electronics. Also directly controlling 
+components such as electromechanical relays and lights is made simple with the digital on-off output.
+<br>Note: 
+1. These settings are stored in the receiver, never in the transmitter.
+2. 'Normal' PWM is only supported on a few select pins, depending on the receiver pin mapping. 
+3. For safety, any changes made will only be effected upon rebooting the receiver.
+4. In digital on-off mode, output value range of -100 to -50 maps to LOW, -49 to 49 is ignored, 50 to 100 maps to HIGH.
 
-Unless otherwise specified, offset is 0, differential is 0
-
-#### Vtail
-Left servo in ch2, right servo in ch4
-1. Ch2 =  50%Rud + -50%Ele
-2. Ch4 = -50%Rud + -50%Ele
-
-#### Elevon
-Left servo in Ch1, right servo in Ch2
-1. Ch1 = -50%Ail + -50%Ele
-2. Ch2 =  50%Ail + -50%Ele
-
-#### Aileron differential
-Left aileron in Ch1, right aileron in Ch8
-1. Ch1 = -100%Ail{-25%Diff}
-2. Ch8 =  100%Ail{ 25%Diff}
-
-#### Crow mix
-We would like to setup crow braking on our plane. 
-Left ail servo in Ch1, Right Ail servo in Ch8,
-left flap servo in Ch5, right flap servo in Ch6.
-Using switch 3 position SwC to control the mix. 
-When SwC in in upper or middle position, normal aileron action occurs. Half flaps are
-deployed when SwC is in middle position.
-When SwC is in lower position, both ailerons move upward and full flaps are deployed
-thus providing crow braking feature.
-1. Ch1 = -100%Ail{-25%Diff} + 50SwC{100%Diff}
-2. Ch8 =  100%Ail{ 25%Diff} + 50SwC{100%Diff}
-3. Ch5 = -50SwC{-50offset}
-4. Ch5 = -50SwC{-50offset}
-
-#### Differential thrust (twin motor)
-Left motor in Ch3, right motor in Ch7. 
-We can use a switch e.g SwD to turn the mix on or off. 
-1. Virt1 = 40%Rud * 100%SwD{100%Diff}
-1. Ch3  = 100%Thrt + 100%Virt1
-2. Ch7  = 100%Thrt + -100%Virt1
-
-#### Elevator throttle mixing
-When the throttle is increased, some down elevator can be added. 
-1. Ch2 = -100%Ele + -20%thr{-20 offset}
-
-#### Variable Steering Depending on Throttle Position
-This reduces the sensitivity of nosewheel steering as the throttle setting increases.
-Suppose we want a steering rate of 100% when the throttle is closed, 
-reducing to zero rate (no nosewheel steering) at full throttle. 
-What is required is a Multiply mix added to the nosewheel servo channel.
-1. Ch6 = 100%yaw * -50%thr{50 offset}
-
-#### Trim with the knob
-Example: We would like to trim our planes elevator with the knob while in flight
-1. Ch2 = -100%Ele + -30%knob
-Note: This doesnt change the subtrim so we have to manually remove this mix later
-and adjust the subtrim manually when not in flight 
-
-## Testing:
-I have done various tests on this system and found it reliable. The achievable range I got with the SX1278 modules at the settings I used was more than 1.5km Line of sight. The transmitter to receiver update rate is around 35 frames a second which is sufficient to control an RC model. There are no issues with the servos either. 
-
-## Limitations:
-1. No trim buttons. A workaround is to trim with the knob. 
-2. No basic telemetry support. 
-3. Presently the RF transmission occurs at a fixed frequency (433Mhz) thus may interfere
-with other devices. 
-4. No addressing and no binding between transmitter and receiver. No more than one active receiver can be used at a time.
-
-## To do:
-1. Implement frequency hopping

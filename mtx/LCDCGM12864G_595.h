@@ -14,8 +14,7 @@
    [SR Pin 12 (ST_CP)] to Arduino pin - [latchpin]
    [SR Pin 11 (SH_CP)] to Arduino pin - (sclk)
 
-   NB: Note with hardware SPI MISO and SS pins aren't used but will still be read
-   and written to during SPI transfer.  Be careful sharing these pins!
+   NB: Note with hardware SPI MISO. Be careful sharing these pins!
 
   ------------------Other CGM12864G LCD conections--------------------------
    RS  to Arduino pin - [QRS]
@@ -27,10 +26,6 @@
 
 #ifndef _CGM12864G_595_H
 #define _CGM12864G_595_H
-
-#include "Arduino.h"
-
-#include <SPI.h>
 
 typedef volatile uint8_t PortReg;
 typedef uint8_t PortMask;
@@ -50,8 +45,8 @@ class LCDCGM12864G_595 : public GFX
     void clearDisplay(void);
     void display();
 
-    void drawPixel(int16_t x, int16_t y, uint16_t color);
-    uint8_t getPixel(int16_t x, int16_t y);
+    void drawPixel(uint8_t x, uint8_t y, uint8_t color);
+    uint8_t getPixel(uint8_t x, uint8_t y);
 
   private:
     int8_t _qrs, _qrd, _qrst, _latchPin;

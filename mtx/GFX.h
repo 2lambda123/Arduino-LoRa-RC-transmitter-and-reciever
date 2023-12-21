@@ -5,6 +5,7 @@
 
 #include <avr/pgmspace.h>
 // Standard ASCII 5x7 font
+// Code page 437 character set
 static const unsigned char font[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00,
   0x3E, 0x5B, 0x4F, 0x5B, 0x3E,
@@ -138,7 +139,7 @@ static const unsigned char font[] PROGMEM = {
   0x3A, 0x40, 0x40, 0x20, 0x7A,
   0x38, 0x54, 0x54, 0x55, 0x59,
   0x21, 0x55, 0x55, 0x79, 0x41,
-  0x22, 0x54, 0x54, 0x78, 0x42, // a-umlaut
+  0x22, 0x54, 0x54, 0x78, 0x42, 
   0x21, 0x55, 0x54, 0x78, 0x40,
   0x20, 0x54, 0x55, 0x79, 0x40,
   0x0C, 0x1E, 0x52, 0x72, 0x12,
@@ -148,18 +149,18 @@ static const unsigned char font[] PROGMEM = {
   0x00, 0x00, 0x45, 0x7C, 0x41,
   0x00, 0x02, 0x45, 0x7D, 0x42,
   0x00, 0x01, 0x45, 0x7C, 0x40,
-  0x7D, 0x12, 0x11, 0x12, 0x7D, // A-umlaut
+  0x7D, 0x12, 0x11, 0x12, 0x7D, 
   0xF0, 0x28, 0x25, 0x28, 0xF0,
   0x7C, 0x54, 0x55, 0x45, 0x00,
   0x20, 0x54, 0x54, 0x7C, 0x54,
   0x7C, 0x0A, 0x09, 0x7F, 0x49,
   0x32, 0x49, 0x49, 0x49, 0x32,
-  0x3A, 0x44, 0x44, 0x44, 0x3A, // o-umlaut
+  0x3A, 0x44, 0x44, 0x44, 0x3A, 
   0x32, 0x4A, 0x48, 0x48, 0x30,
   0x3A, 0x41, 0x41, 0x21, 0x7A,
   0x3A, 0x42, 0x40, 0x20, 0x78,
   0x00, 0x9D, 0xA0, 0xA0, 0x7D,
-  0x3D, 0x42, 0x42, 0x42, 0x3D, // O-umlaut
+  0x3D, 0x42, 0x42, 0x42, 0x3D, 
   0x3D, 0x40, 0x40, 0x40, 0x3D,
   0x3C, 0x24, 0xFF, 0x24, 0x24,
   0x48, 0x7E, 0x49, 0x43, 0x66,
@@ -182,9 +183,9 @@ static const unsigned char font[] PROGMEM = {
   0x00, 0x00, 0x7B, 0x00, 0x00,
   0x08, 0x14, 0x2A, 0x14, 0x22,
   0x22, 0x14, 0x2A, 0x14, 0x08,
-  0x55, 0x00, 0x55, 0x00, 0x55, // #176 (25% block) missing in old code
-  0xAA, 0x55, 0xAA, 0x55, 0xAA, // 50% block
-  0xFF, 0x55, 0xFF, 0x55, 0xFF, // 75% block
+  0x55, 0x00, 0x55, 0x00, 0x55, 
+  0xAA, 0x55, 0xAA, 0x55, 0xAA, 
+  0xFF, 0x55, 0xFF, 0x55, 0xFF, 
   0x00, 0x00, 0x00, 0xFF, 0x00,
   0x10, 0x10, 0x10, 0xFF, 0x00,
   0x14, 0x14, 0x14, 0xFF, 0x00,
@@ -231,7 +232,7 @@ static const unsigned char font[] PROGMEM = {
   0x00, 0x00, 0x00, 0xFF, 0xFF,
   0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
   0x38, 0x44, 0x44, 0x38, 0x44,
-  0xFC, 0x4A, 0x4A, 0x4A, 0x34, // sharp-s or beta
+  0xFC, 0x4A, 0x4A, 0x4A, 0x34, 
   0x7E, 0x02, 0x02, 0x06, 0x06,
   0x02, 0x7E, 0x02, 0x7E, 0x02,
   0x63, 0x55, 0x49, 0x41, 0x63,
@@ -261,7 +262,7 @@ static const unsigned char font[] PROGMEM = {
   0x00, 0x1F, 0x01, 0x01, 0x1E,
   0x00, 0x19, 0x1D, 0x17, 0x12,
   0x00, 0x3C, 0x3C, 0x3C, 0x3C,
-  0x00, 0x00, 0x00, 0x00, 0x00 // #255 NBSP
+  0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 
@@ -269,68 +270,48 @@ class GFX : public Print
 {
 
 public:
-  GFX(int16_t w, int16_t h); // Constructor
+  GFX(uint8_t w, uint8_t h); // Constructor
 
   // This MUST be defined by the subclass:
-  virtual void drawPixel(int16_t x, int16_t y, uint16_t color) = 0;
-
-  // TRANSACTION API / CORE DRAW API
-  // These MAY be overridden by the subclass to provide device-specific
-  // optimized code.  Otherwise 'generic' versions are used.
-
-  virtual void writePixel(int16_t x, int16_t y, uint16_t color);
-  virtual void writeFillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
-  virtual void writeFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
-  virtual void writeFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
-  virtual void writeLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+  virtual void drawPixel(uint8_t x, uint8_t y, uint8_t color) = 0;
 
 
-  // BASIC DRAW API
-  // These MAY be overridden by the subclass to provide device-specific
-  // optimized code.  Otherwise 'generic' versions are used.
-  virtual void
-      // It's good to implement those, even if using transaction API
-      drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color),
-      drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color),
-      fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color),
-      // Optional and probably not necessary to change
-      drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color),
-      drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+  void
+      drawVLine(uint8_t x, uint8_t y, uint8_t h, uint8_t color),
+      drawHLine(uint8_t x, uint8_t y, uint8_t w, uint8_t color),
+      fillRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color),
+      drawRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color);
 
   // These exist only with GFX (no subclass overrides)
   void
-      drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[], int16_t w, int16_t h, uint16_t color),
-      drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, uint16_t bg, uint8_t size),
-      setCursor(int16_t x, int16_t y),
-      setTextColor(uint16_t c),
-      setTextColor(uint16_t c, uint16_t bg),
-      setTextSize(uint8_t s),
+      drawBitmap(uint8_t x, uint8_t y, const uint8_t bitmap[], uint8_t w, uint8_t h, uint8_t color),
+      drawChar(uint8_t x, uint8_t y, unsigned char c, uint8_t color),
+      setCursor(uint8_t x, uint8_t y),
+      setTextColor(uint8_t c),
       setTextWrap(boolean w);
       
   virtual size_t write(uint8_t);
 
-  int16_t height(void) const;
-  int16_t width(void) const;
+  uint8_t height(void) const;
+  uint8_t width(void) const;
   
   // get current cursor position
-  int16_t getCursorX(void) const;
-  int16_t getCursorY(void) const;
+  uint8_t getCursorX(void) const;
+  uint8_t getCursorY(void) const;
 
 
 protected:
   
-  const int16_t
+  const uint8_t
       WIDTH,
       HEIGHT; // This is the 'raw' display w/h - never changes
-  int16_t
+  uint8_t
       _width,
       _height, // Display w/h as modified by current rotation
       cursor_x, cursor_y;
-  uint16_t
-      textcolor,
-      textbgcolor;
   uint8_t
-      textsize,
+      textcolor;
+  uint8_t
       rotation;
   boolean
       wrap;  // If set, 'wrap' text at right edge of display

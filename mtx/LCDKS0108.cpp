@@ -1,15 +1,12 @@
-#include <avr/pgmspace.h>
 
 #include "Arduino.h"
+#include <SPI.h>
+#include "GFX.h"
+#include "LCDKS0108.h"
 
 #ifndef _BV
 #define _BV(x) (1 << (x))
 #endif
-
-#include <stdlib.h>
-
-#include "GFX.h"
-#include "LCDKS0108.h"
 
 LCDKS0108::LCDKS0108(int8_t QRS, int8_t QEN, int8_t QCS1, int8_t QCS2, int8_t latchpin) : GFX(LCDWIDTH, LCDHEIGHT)
 {
@@ -22,31 +19,11 @@ LCDKS0108::LCDKS0108(int8_t QRS, int8_t QEN, int8_t QCS1, int8_t QCS2, int8_t la
 }
 
 // the most basic function, set a single pixel
-void LCDKS0108::drawPixel(int16_t x, int16_t y, uint16_t color)
+void LCDKS0108::drawPixel(uint8_t x, uint8_t y, uint8_t color)
 {
-  if ((x < 0) || (x >= _width) || (y < 0) || (y >= _height))
-    return;
+  //Rotation code removed here
 
-  int16_t t;
-  switch (rotation)
-  {
-    case 1:
-      t = x;
-      x = y;
-      y = LCDHEIGHT - 1 - t;
-      break;
-    case 2:
-      x = LCDWIDTH - 1 - x;
-      y = LCDHEIGHT - 1 - y;
-      break;
-    case 3:
-      t = x;
-      x = LCDWIDTH - 1 - y;
-      y = t;
-      break;
-  }
-
-  if ((x < 0) || (x >= LCDWIDTH) || (y < 0) || (y >= LCDHEIGHT))
+  if ((x >= LCDWIDTH) || (y >= LCDHEIGHT))
     return;
 
   if (color)
@@ -56,9 +33,9 @@ void LCDKS0108::drawPixel(int16_t x, int16_t y, uint16_t color)
 }
 
 // the most basic function, get a single pixel
-uint8_t LCDKS0108::getPixel(int16_t x, int16_t y)
+uint8_t LCDKS0108::getPixel(uint8_t x, uint8_t y)
 {
-  if ((x < 0) || (x >= LCDWIDTH) || (y < 0) || (y >= LCDHEIGHT))
+  if ((x >= LCDWIDTH) || (y >= LCDHEIGHT))
     return 0;
 
   return (dispBuffer[x + (y / 8) * LCDWIDTH] >> (y % 8)) & 0x1;
@@ -88,73 +65,70 @@ void LCDKS0108::begin()
   latchPort = portOutputRegister(digitalPinToPort(_latchPin));
   latchpinmask = digitalPinToBitMask(_latchPin);
 
-  // Setup hardware SPI.
-  SPI.begin();
-  SPI.setBitOrder(MSBFIRST);
-  //SPI.setBitOrder(LSBFIRST);
+  delay(50);
 
   //initialise lcd
-  lcdCommand(DISP_OFF);
-  lcdCommand(START_LINE);
+  SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
   lcdCommand(DISP_ON);
-  lcdCommand(SET_ADDRESS);
-  lcdCommand(SET_PAGE);
+  lcdCommand(START_LINE);
+  SPI.endTransaction();
 }
 
-void LCDKS0108::setNewPage(unsigned char PageData)
+void LCDKS0108::setPage(uint8_t pageNo)
 {
-  PageData = PageData + SET_PAGE;
-  lcdCommand(PageData);
-  lcdCommand(SET_ADDRESS);
+  lcdCommand(SET_PAGE | pageNo);
+  lcdCommand(SET_Y_ADDRESS);
 }
 
 void LCDKS0108::display(void)
 {
-  uint8_t data;
-  uint8_t column = 0, page = 0;
+  SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
 
-  setNewPage(0);
-
-  for (uint16_t j = 0; j < 1024; j++)
+  uint16_t dataIdx = 0;
+  for(uint8_t page = 0; page < 8; page++)
   {
-    data = dispBuffer[j];
+    setPage(page);
 
-    if (column == 128)
+    bool isCS2 = false;
+    //enable chip1
+#if defined (CS_ACTIVE_LOW)
+    *qcs1port &= ~qcs1pinmask;  
+    *qcs2port |= qcs2pinmask;
+#else
+    *qcs1port |= qcs1pinmask;  
+    *qcs2port &= ~qcs2pinmask; 
+#endif 
+
+    for(uint8_t column = 0; column < 128; column++)
     {
-      column = 0;
-      page += 1;
-      setNewPage(page);
+      if(!isCS2 && column >= 64) 
+      {
+        isCS2 = true;
+        //enable chip2
+#if defined (CS_ACTIVE_LOW)
+        *qcs2port &= ~qcs2pinmask;
+        *qcs1port |= qcs1pinmask;
+#else 
+        *qcs2port |= qcs2pinmask; 
+        *qcs1port &= ~qcs1pinmask;
+#endif
+      }
+      
+      *qrsport |= qrspinmask; //rs high
+      
+      *latchPort &= ~latchpinmask; //latch low
+      SPI.transfer(dispBuffer[dataIdx++]);
+      *latchPort |= latchpinmask; //latch high
+      
+      //toggle EN
+      delayMicroseconds(3);
+      *qenport |= qenpinmask;  //EN high
+      delayMicroseconds(3);
+      *qenport &= ~qenpinmask; //EN low
     }
-
-    if (column <= 63)
-    {
-      *qcs1port |= qcs1pinmask;  //cs1 high
-      *qcs2port &= ~qcs2pinmask; //cs2 low
-    }
-
-    if (column >= 64)
-    {
-      *qcs2port |= qcs2pinmask;  //cs2 high
-      *qcs1port &= ~qcs1pinmask; //cs1 low
-    }
-
-
-    *qrsport |= qrspinmask;      //rs high
-
-    *latchPort &= ~latchpinmask; //latch low
-
-    //###
-    SPI.transfer(data);
-
-    *latchPort |= latchpinmask; //latch high
-
-    //toggle EN
-    *qenport |= qenpinmask;  //EN high
-    delayMicroseconds(3);
-    *qenport &= ~qenpinmask; //EN low
-
-    column++;
   }
+
+  SPI.endTransaction();
 }
 
 void LCDKS0108::clearDisplay(void) //Clear virtual buffer
@@ -166,20 +140,22 @@ void LCDKS0108::clearDisplay(void) //Clear virtual buffer
 inline void LCDKS0108::lcdCommand(uint8_t command)
 {
   //enable both controllers
+#if defined (CS_ACTIVE_LOW)
+  *qcs1port &= ~qcs1pinmask;
+  *qcs2port &= ~qcs2pinmask;
+#else
   *qcs1port |= qcs1pinmask;
   *qcs2port |= qcs2pinmask;
+#endif
 
-  //drive RS to low
-  *qrsport &= ~qrspinmask;
+  *qrsport &= ~qrspinmask; //rs low
 
   *latchPort &= ~latchpinmask; //latch low
-
-  //send command
   SPI.transfer(command);
-
   *latchPort |= latchpinmask; //latch high
 
   //Toggle EN
+  delayMicroseconds(3);
   *qenport |= qenpinmask; //EN high
   delayMicroseconds(3);
   *qenport &= ~qenpinmask; //EN low
