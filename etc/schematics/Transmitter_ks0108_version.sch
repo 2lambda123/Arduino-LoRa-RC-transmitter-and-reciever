@@ -232,7 +232,7 @@
 Based on the previous libraries:
 &lt;ul&gt;
 &lt;li&gt;r.lbr
-&lt;li&gt;cap.lbr 
+&lt;li&gt;cap.lbr
 &lt;li&gt;cap-fe.lbr
 &lt;li&gt;captant.lbr
 &lt;li&gt;polcap.lbr
@@ -12551,7 +12551,7 @@ Mating cable assembly: Sparkfun &lt;a href="http://www.sparkfun.com/products/991
 Based on the previous libraries:
 &lt;ul&gt;
 &lt;li&gt;r.lbr
-&lt;li&gt;cap.lbr 
+&lt;li&gt;cap.lbr
 &lt;li&gt;cap-fe.lbr
 &lt;li&gt;captant.lbr
 &lt;li&gt;polcap.lbr
@@ -16161,7 +16161,7 @@ Source: avr.lbr</description>
 In this library you'll find all manner of digital ICs- microcontrollers, memory chips, logic chips, FPGAs, etc.&lt;br&gt;&lt;br&gt;
 We've spent an enormous amount of time creating and checking these footprints and parts, but it is the end user's responsibility to ensure correctness and suitablity for a given componet or application. If you enjoy using this library, please buy one of our products at www.sparkfun.com.
 &lt;br&gt;&lt;br&gt;
-&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/ 
+&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/
 &lt;br&gt;&lt;br&gt;
 You are welcome to use this library for commercial purposes. For attribution, we ask that when you begin to sell your device using our footprint, you email us with a link to the product being sold. We want bragging rights that we helped (in a very small part) to create your 8th world wonder. We would like the opportunity to feature your device on our homepage.</description>
 <packages>
@@ -16593,7 +16593,7 @@ Source: http://www.diodes.com/datasheets/ds23001.pdf</description>
 In this library you'll find anything that moves- switches, relays, buttons, potentiometers. Also, anything that goes on a board but isn't electrical in nature- screws, standoffs, etc.&lt;br&gt;&lt;br&gt;
 We've spent an enormous amount of time creating and checking these footprints and parts, but it is the end user's responsibility to ensure correctness and suitablity for a given componet or application. If you enjoy using this library, please buy one of our products at www.sparkfun.com.
 &lt;br&gt;&lt;br&gt;
-&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/ 
+&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/
 &lt;br&gt;&lt;br&gt;
 You are welcome to use this library for commercial purposes. For attribution, we ask that when you begin to sell your device using our footprint, you email us with a link to the product being sold. We want bragging rights that we helped (in a very small part) to create your 8th world wonder. We would like the opportunity to feature your device on our homepage.</description>
 <packages>
@@ -16927,7 +16927,7 @@ For COM-09806 in the SparkFun catalog&lt;br&gt;</description>
 In this library you'll find drivers, regulators, and amplifiers.&lt;br&gt;&lt;br&gt;
 We've spent an enormous amount of time creating and checking these footprints and parts, but it is the end user's responsibility to ensure correctness and suitablity for a given componet or application. If you enjoy using this library, please buy one of our products at www.sparkfun.com.
 &lt;br&gt;&lt;br&gt;
-&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/ 
+&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/
 &lt;br&gt;&lt;br&gt;
 You are welcome to use this library for commercial purposes. For attribution, we ask that when you begin to sell your device using our footprint, you email us with a link to the product being sold. We want bragging rights that we helped (in a very small part) to create your 8th world wonder. We would like the opportunity to feature your device on our homepage.</description>
 <packages>
@@ -17688,9 +17688,9 @@ K</text>
 <text x="-3.302" y="258.318" size="1.778" layer="97">VBATT</text>
 <text x="-5.08" y="246.38" size="1.778" layer="97">Power connector</text>
 <text x="-5.588" y="222.758" size="1.27" layer="97">The max voltage here
-should not exceed 4.7V, 
+should not exceed 4.7V,
 so the resistors in this
-voltage divider should 
+voltage divider should
 be sized appropriately</text>
 <text x="160.02" y="213.36" size="1.778" layer="97" rot="R90">JOYSTICK_1</text>
 <text x="160.02" y="180.34" size="1.778" layer="97" rot="R90">JOYSTICK_2</text>
@@ -17716,7 +17716,7 @@ or 8ohm 0.25W speaker</text>
 <text x="206.502" y="184.912" size="1.27" layer="97" rot="R90">NC</text>
 <text x="-2.54" y="2.54" size="2.54" layer="97">RC Transmitter
 Schematic by
-BUK7456 
+BUK7456
 2020-2021</text>
 <wire x1="-7.62" y1="17.78" x2="-7.62" y2="0" width="0.6096" layer="97"/>
 <wire x1="-7.62" y1="0" x2="43.18" y2="0" width="0.6096" layer="97"/>
@@ -17742,8 +17742,8 @@ BUK7456
 <text x="-3.302" y="263.398" size="1.778" layer="97">V_IN</text>
 <text x="-3.302" y="260.858" size="1.778" layer="97">V_IN</text>
 <text x="32.258" y="274.828" size="1.27" layer="97" ratio="10" rot="R180">V_IN is 7-12V.
-VBATT and V_IN can be 
-shorted together e.g. when using 
+VBATT and V_IN can be
+shorted together e.g. when using
 2 series Li-ion cells.</text>
 </plain>
 <instances>

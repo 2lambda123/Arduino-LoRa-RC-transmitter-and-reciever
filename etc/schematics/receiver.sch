@@ -232,7 +232,7 @@
 Based on the previous libraries:
 &lt;ul&gt;
 &lt;li&gt;r.lbr
-&lt;li&gt;cap.lbr 
+&lt;li&gt;cap.lbr
 &lt;li&gt;cap-fe.lbr
 &lt;li&gt;captant.lbr
 &lt;li&gt;polcap.lbr
@@ -12365,7 +12365,7 @@ type 0207, grid 15mm</description>
 In this library you'll find drivers, regulators, and amplifiers.&lt;br&gt;&lt;br&gt;
 We've spent an enormous amount of time creating and checking these footprints and parts, but it is the end user's responsibility to ensure correctness and suitablity for a given componet or application. If you enjoy using this library, please buy one of our products at www.sparkfun.com.
 &lt;br&gt;&lt;br&gt;
-&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/ 
+&lt;b&gt;Licensing:&lt;/b&gt; Creative Commons ShareAlike 4.0 International - https://creativecommons.org/licenses/by-sa/4.0/
 &lt;br&gt;&lt;br&gt;
 You are welcome to use this library for commercial purposes. For attribution, we ask that when you begin to sell your device using our footprint, you email us with a link to the product being sold. We want bragging rights that we helped (in a very small part) to create your 8th world wonder. We would like the opportunity to feature your device on our homepage.</description>
 <packages>
@@ -14822,9 +14822,9 @@ Schematic by BUK7456
 R9,R10,R11,
 R12,R13,R16,R17
 are 220 OHM</text>
-<text x="63.5" y="149.86" size="1.778" layer="97">Note: 
+<text x="63.5" y="149.86" size="1.778" layer="97">Note:
 1. Measurement of the external voltage requires the same ground refence
-   as rest of ciruit, else a dangerous short circuit occurs. 
+   as rest of ciruit, else a dangerous short circuit occurs.
 2. Measurement is done using internal 1.1V adc reference. </text>
 <text x="66.04" y="142.24" size="1.778" layer="97">ExtVolts
 Max 17V</text>
