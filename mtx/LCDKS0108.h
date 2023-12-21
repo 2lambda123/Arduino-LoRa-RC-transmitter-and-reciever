@@ -21,7 +21,7 @@ typedef uint8_t PortMask;
 
 class LCDKS0108 : public GFX
 {
-  public:
+public:
     LCDKS0108(int8_t QRS, int8_t QEN, int8_t QCS1, int8_t QCS2, int8_t latchpin);
 
     void begin();
@@ -31,7 +31,7 @@ class LCDKS0108 : public GFX
     void drawPixel(uint8_t x, uint8_t y, uint8_t color);
     uint8_t getPixel(uint8_t x, uint8_t y);
 
-  private:
+private:
     int8_t _qrs, _qen, _qcs1, _qcs2;
     int8_t _latchPin;
 
