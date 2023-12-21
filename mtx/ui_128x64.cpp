@@ -24,10 +24,10 @@ enum {
   NOWRAP = false
 };
 enum {
-  PRESSED_ONLY = 0, 
-  PRESSED_OR_HELD = 1, 
-  SLOW_CHANGE = 2, 
-  FAST_CHANGE
+  INCDEC_PRESSED_ONLY = 0, 
+  INCDEC_SLOW, 
+  INCDEC_NORMAL,
+  INCDEC_FAST
 }; 
 
 //--- helpers ----
@@ -94,35 +94,36 @@ char const srcName2[]  PROGMEM = "thrt";
 char const srcName3[]  PROGMEM = "yaw";
 char const srcName4[]  PROGMEM = "knob";
 char const srcName5[]  PROGMEM = "max";
-char const srcName6[]  PROGMEM = "SwA"; 
-char const srcName7[]  PROGMEM = "SwB"; 
-char const srcName8[]  PROGMEM = "SwC"; 
-char const srcName9[]  PROGMEM = "SwD"; 
-char const srcName10[] PROGMEM = "SwE"; 
-char const srcName11[] PROGMEM = "SwF"; 
-char const srcName12[] PROGMEM = "Slow";
-char const srcName13[] PROGMEM = "Ail";
-char const srcName14[] PROGMEM = "Ele";
-char const srcName15[] PROGMEM = "Thrt";
-char const srcName16[] PROGMEM = "Rud";
-char const srcName17[] PROGMEM = "None";
-char const srcName18[] PROGMEM = "Ch1";
-char const srcName19[] PROGMEM = "Ch2";
-char const srcName20[] PROGMEM = "Ch3";
-char const srcName21[] PROGMEM = "Ch4";
-char const srcName22[] PROGMEM = "Ch5";
-char const srcName23[] PROGMEM = "Ch6";
-char const srcName24[] PROGMEM = "Ch7";
-char const srcName25[] PROGMEM = "Ch8";
-char const srcName26[] PROGMEM = "Ch9";
-char const srcName27[] PROGMEM = "Virt1";
-char const srcName28[] PROGMEM = "Virt2";
+char const srcName6[]  PROGMEM = "fgen";
+char const srcName7[]  PROGMEM = "SwA"; 
+char const srcName8[]  PROGMEM = "SwB"; 
+char const srcName9[]  PROGMEM = "SwC"; 
+char const srcName10[] PROGMEM = "SwD"; 
+char const srcName11[] PROGMEM = "SwE"; 
+char const srcName12[] PROGMEM = "SwF"; 
+char const srcName13[] PROGMEM = "Slow";
+char const srcName14[] PROGMEM = "Ail";
+char const srcName15[] PROGMEM = "Ele";
+char const srcName16[] PROGMEM = "Thrt";
+char const srcName17[] PROGMEM = "Rud";
+char const srcName18[] PROGMEM = "None";
+char const srcName19[] PROGMEM = "Ch1";
+char const srcName20[] PROGMEM = "Ch2";
+char const srcName21[] PROGMEM = "Ch3";
+char const srcName22[] PROGMEM = "Ch4";
+char const srcName23[] PROGMEM = "Ch5";
+char const srcName24[] PROGMEM = "Ch6";
+char const srcName25[] PROGMEM = "Ch7";
+char const srcName26[] PROGMEM = "Ch8";
+char const srcName27[] PROGMEM = "Ch9";
+char const srcName28[] PROGMEM = "Virt1";
+char const srcName29[] PROGMEM = "Virt2";
 
 const char* const srcNames[] PROGMEM = {
   srcName0, srcName1, srcName2, srcName3, srcName4, srcName5, srcName6, srcName7, 
   srcName8, srcName9, srcName10,srcName11, srcName12, srcName13, srcName14,
   srcName15, srcName16, srcName17, srcName18, srcName19, srcName20, srcName21, 
-  srcName22, srcName23, srcName24, srcName25, srcName26, srcName27, srcName28
+  srcName22, srcName23, srcName24, srcName25, srcName26, srcName27, srcName28, srcName29
 };
 
 //Mix control switch strings
@@ -206,6 +207,16 @@ char const tmrOperatorStr3[] PROGMEM = "abs<";
 const char* const tmrOperatorStr[] PROGMEM = {
   tmrOperatorStr0, tmrOperatorStr1, tmrOperatorStr2, tmrOperatorStr3
 };
+
+//Function generator strings
+char const funcgenStr0[] PROGMEM = "Sine";
+char const funcgenStr1[] PROGMEM = "Sawtooth";
+char const funcgenStr2[] PROGMEM = "Triangle";
+char const funcgenStr3[] PROGMEM = "Square";
+const char* const funcgenStr[] PROGMEM = {  
+  funcgenStr0, funcgenStr1, funcgenStr2, funcgenStr3
+};
+
 
 //-- Main menu strings. Max 16 characters per string
 #define NUM_ITEMS_MAIN_MENU 9
@@ -735,20 +746,21 @@ void handleMainUI()
         
         if (focusedItem == 1)
         {
-          Model.timer1ControlSrc = incDecOnUpDown(Model.timer1ControlSrc, 0, NUM_MIXSOURCES - 1, NOWRAP, SLOW_CHANGE);
+          Model.timer1ControlSrc = incDecOnUpDown(Model.timer1ControlSrc, 0, NUM_MIXSOURCES - 1, NOWRAP, INCDEC_SLOW);
           //Validate sources. Allowed sources are raw sticks, knob, switches, channels, virtuals
           while(Model.timer1ControlSrc == IDX_100PERC 
+                || Model.timer1ControlSrc == IDX_FUNCGEN
                 || (Model.timer1ControlSrc >= IDX_SLOW1 && Model.timer1ControlSrc <= IDX_RUD))
           {
-            Model.timer1ControlSrc = incDecOnUpDown(Model.timer1ControlSrc, 0, NUM_MIXSOURCES - 1, NOWRAP, SLOW_CHANGE);
+            Model.timer1ControlSrc = incDecOnUpDown(Model.timer1ControlSrc, 0, NUM_MIXSOURCES - 1, NOWRAP, INCDEC_SLOW);
           }
         }
         else if(focusedItem == 2)
-          Model.timer1Operator = incDecOnUpDown(Model.timer1Operator, 0, NUM_TIMER_OPERATORS - 1, NOWRAP, SLOW_CHANGE);
+          Model.timer1Operator = incDecOnUpDown(Model.timer1Operator, 0, NUM_TIMER_OPERATORS - 1, NOWRAP, INCDEC_SLOW);
         else if(focusedItem == 3)
-          Model.timer1Value = incDecOnUpDown(Model.timer1Value, -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.timer1Value = incDecOnUpDown(Model.timer1Value, -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 4)
-          Model.timer1InitMins = incDecOnUpDown(Model.timer1InitMins, 0, 240, NOWRAP, PRESSED_OR_HELD);
+          Model.timer1InitMins = incDecOnUpDown(Model.timer1InitMins, 0, 240, NOWRAP, INCDEC_NORMAL);
           
       
         if (heldButton == SELECT_KEY)
@@ -790,9 +802,9 @@ void handleMainUI()
   
         //------ handle navigation
         isEditMode = true;
-        menuHighlightedItem = incDecOnUpDown(menuHighlightedItem, _numMenuItems, 1, WRAP, SLOW_CHANGE);
+        menuHighlightedItem = incDecOnUpDown(menuHighlightedItem, _numMenuItems, 1, WRAP, INCDEC_SLOW);
         if (menuHighlightedItem < menuTopItem || menuHighlightedItem >= (menuTopItem + 4))
-          menuTopItem = incDecOnUpDown(menuTopItem, _numMenuItems - 3, 1, WRAP, SLOW_CHANGE);
+          menuTopItem = incDecOnUpDown(menuTopItem, _numMenuItems - 3, 1, WRAP, INCDEC_SLOW);
         isEditMode = false;
         
         //------ show heading
@@ -855,9 +867,9 @@ void handleMainUI()
         
         // handle navigation
         isEditMode = true;
-        thisMdl = incDecOnUpDown(thisMdl, maxNumOfModels, 1, WRAP, SLOW_CHANGE);
+        thisMdl = incDecOnUpDown(thisMdl, maxNumOfModels, 1, WRAP, INCDEC_SLOW);
         if(thisMdl < _top || thisMdl >= (_top + 6))
-          _top = incDecOnUpDown(_top, maxNumOfModels - 5, 1, WRAP, SLOW_CHANGE);
+          _top = incDecOnUpDown(_top, maxNumOfModels - 5, 1, WRAP, INCDEC_SLOW);
         isEditMode = false;
         
         // fill list
@@ -1022,7 +1034,7 @@ void handleMainUI()
         else if(thisChar <= 122) thisChar -= 70;
         
         //adjust 
-        thisChar = incDecOnUpDown(thisChar, 65, 0, NOWRAP, SLOW_CHANGE);
+        thisChar = incDecOnUpDown(thisChar, 65, 0, NOWRAP, INCDEC_SLOW);
 
         //map back
         if(thisChar <= 25) thisChar = 90 - thisChar;
@@ -1067,10 +1079,10 @@ void handleMainUI()
       {
         //change source model
         isEditMode = true;
-        thisMdl = incDecOnUpDown(thisMdl, 1, maxNumOfModels, WRAP, SLOW_CHANGE);
+        thisMdl = incDecOnUpDown(thisMdl, 1, maxNumOfModels, WRAP, INCDEC_SLOW);
         //validate
         while(modelIsfree(thisMdl))
-          thisMdl = incDecOnUpDown(thisMdl, 1, maxNumOfModels, WRAP, SLOW_CHANGE);
+          thisMdl = incDecOnUpDown(thisMdl, 1, maxNumOfModels, WRAP, INCDEC_SLOW);
         
         display.drawRect(15,11,97,40,BLACK); //draw bounding box
         
@@ -1177,11 +1189,11 @@ void handleMainUI()
       {
         drawHeader((char *)pgm_read_word(&mainMenu[MODE_INPUTS]));
 
-        enum{AIL_CURVE = 0, ELE_CURVE = 1, RUD_CURVE = 2, THR_CURVE, SLOW1, RAW_INPUTS};
+        enum{AIL_CURVE = 0, ELE_CURVE = 1, RUD_CURVE = 2, THR_CURVE, SLOW1, FUNCGEN, RAW_INPUTS};
         static uint8_t _page = AIL_CURVE;
         
         if (focusedItem == 1)
-          _page = incDecOnUpDown(_page, 0, 5, WRAP, SLOW_CHANGE);
+          _page = incDecOnUpDown(_page, 0, 6, WRAP, INCDEC_SLOW);
           
         ///////////////// RATES AND EXPO ////////////////////////////////////////
         if(_page == AIL_CURVE || _page == ELE_CURVE || _page == RUD_CURVE)  
@@ -1204,9 +1216,9 @@ void handleMainUI()
 
           //Adjust values
           if (focusedItem == 2)
-            *_rate = incDecOnUpDown(*_rate, 0, 100, NOWRAP, PRESSED_OR_HELD); 
+            *_rate = incDecOnUpDown(*_rate, 0, 100, NOWRAP, INCDEC_NORMAL); 
           else if (focusedItem == 3)
-            *_expo = incDecOnUpDown(*_expo, -100, 100, NOWRAP, PRESSED_OR_HELD);
+            *_expo = incDecOnUpDown(*_expo, -100, 100, NOWRAP, INCDEC_NORMAL);
           else if (focusedItem == 4 && isEditMode)
           {
             if(pressedButton == UP_KEY || pressedButton == DOWN_KEY)
@@ -1263,9 +1275,9 @@ void handleMainUI()
           
           //adjust 
           if(focusedItem == 2)
-            _thisPt = incDecOnUpDown(_thisPt, 0, 4, WRAP, SLOW_CHANGE);
+            _thisPt = incDecOnUpDown(_thisPt, 0, 4, WRAP, INCDEC_SLOW);
           else if(focusedItem == 3)
-            Model.throttlePts[_thisPt] = incDecOnUpDown(Model.throttlePts[_thisPt], -100, 100, NOWRAP, PRESSED_OR_HELD);
+            Model.throttlePts[_thisPt] = incDecOnUpDown(Model.throttlePts[_thisPt], -100, 100, NOWRAP, INCDEC_NORMAL);
 
           //-----draw text
           display.setCursor(8, 11);
@@ -1343,13 +1355,44 @@ void handleMainUI()
           display.print(txtBuff);
           
           if(focusedItem == 2)
-            Model.slow1Up = incDecOnUpDown(Model.slow1Up, 0, 50, NOWRAP, PRESSED_OR_HELD);
+            Model.slow1Up = incDecOnUpDown(Model.slow1Up, 0, 50, NOWRAP, INCDEC_NORMAL);
           else if(focusedItem == 3)
-            Model.slow1Down = incDecOnUpDown(Model.slow1Down, 0, 50, NOWRAP, PRESSED_OR_HELD);
+            Model.slow1Down = incDecOnUpDown(Model.slow1Down, 0, 50, NOWRAP, INCDEC_NORMAL);
           else if(focusedItem == 4)
-            Model.slow1Src = incDecOnUpDown(Model.slow1Src, IDX_SWA, IDX_SWF, NOWRAP, PRESSED_OR_HELD);
+            Model.slow1Src = incDecOnUpDown(Model.slow1Src, IDX_SWA, IDX_SWF, NOWRAP, INCDEC_SLOW);
         }
-
+        
+        
+        ////////////////// FUNCTION GENERATOR /////////////////////////////////
+        if(_page == FUNCGEN)
+        {
+          changeFocusOnUPDOWN(3);
+          toggleEditModeOnSelectClicked();
+          
+          display.setCursor(8, 11);
+          strlcpy_P(txtBuff, PSTR("FuncGen"), sizeof(txtBuff));
+          display.print(txtBuff);
+          display.drawHLine(8, 19, strlen(txtBuff) * 6, BLACK);
+          
+          display.setCursor(0, 22);
+          display.print(F("Wave:  "));
+          strlcpy_P(txtBuff, (char *)pgm_read_word(&(funcgenStr[Model.funcgenWaveform])), sizeof(txtBuff));
+          display.print(txtBuff);
+          
+          display.setCursor(0, 31);
+          display.print(F("Prd:   "));
+          display.print(Model.funcgenPeriod / 10);
+          display.print(F("."));
+          display.print(Model.funcgenPeriod % 10);
+          display.print(F("s"));
+          
+          
+          if(focusedItem == 2)
+            Model.funcgenWaveform = incDecOnUpDown(Model.funcgenWaveform, 0, NUM_FUNC_WAVEFORMS - 1, WRAP, INCDEC_SLOW);
+          else if(focusedItem == 3)
+            Model.funcgenPeriod = incDecOnUpDown(Model.funcgenPeriod, 5, 200, NOWRAP, INCDEC_NORMAL);
+        }
+        
         ////////////////// RAW /////////////////////////////////////////////////
         if(_page == RAW_INPUTS)
         {
@@ -1488,36 +1531,36 @@ void handleMainUI()
 
         //edit values
         if (focusedItem == 1)     //Change to another mixer slot
-          thisMixNum = incDecOnUpDown(thisMixNum, 0, NUM_MIXSLOTS - 1, WRAP, SLOW_CHANGE);
+          thisMixNum = incDecOnUpDown(thisMixNum, 0, NUM_MIXSLOTS - 1, WRAP, INCDEC_SLOW);
         else if(focusedItem == 2) //change output
-          Model.mixOut[thisMixNum] = incDecOnUpDown(Model.mixOut[thisMixNum], IDX_NONE, NUM_MIXSOURCES - 1, NOWRAP, SLOW_CHANGE);
+          Model.mixOut[thisMixNum] = incDecOnUpDown(Model.mixOut[thisMixNum], IDX_NONE, NUM_MIXSOURCES - 1, NOWRAP, INCDEC_SLOW);
         else if(focusedItem == 3) //change input 1
-          Model.mixIn1[thisMixNum] = incDecOnUpDown(Model.mixIn1[thisMixNum], 0, NUM_MIXSOURCES - 1, NOWRAP, SLOW_CHANGE);
+          Model.mixIn1[thisMixNum] = incDecOnUpDown(Model.mixIn1[thisMixNum], 0, NUM_MIXSOURCES - 1, NOWRAP, INCDEC_SLOW);
         else if(focusedItem == 4) //adjust weight 1
-          Model.mixIn1Weight[thisMixNum] = incDecOnUpDown(Model.mixIn1Weight[thisMixNum], -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.mixIn1Weight[thisMixNum] = incDecOnUpDown(Model.mixIn1Weight[thisMixNum], -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 5) //adjust offset 1
-          Model.mixIn1Offset[thisMixNum] = incDecOnUpDown(Model.mixIn1Offset[thisMixNum], -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.mixIn1Offset[thisMixNum] = incDecOnUpDown(Model.mixIn1Offset[thisMixNum], -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 6) //adjust differential 1
-          Model.mixIn1Diff[thisMixNum] = incDecOnUpDown(Model.mixIn1Diff[thisMixNum], -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.mixIn1Diff[thisMixNum] = incDecOnUpDown(Model.mixIn1Diff[thisMixNum], -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 7) //change operator
         {
           uint8_t _mixOper = Model.mixOper_N_Switch[thisMixNum] >> 6;
-          _mixOper = incDecOnUpDown(_mixOper, 0, NUM_MIXOPERATORS - 1, WRAP, PRESSED_ONLY);
+          _mixOper = incDecOnUpDown(_mixOper, 0, NUM_MIXOPERATORS - 1, WRAP, INCDEC_SLOW);
           Model.mixOper_N_Switch[thisMixNum] &= ~0xC0; //clear bits 7 and 6
           Model.mixOper_N_Switch[thisMixNum] |= _mixOper << 6;
         }
         else if(focusedItem == 8) //change input 2
-          Model.mixIn2[thisMixNum] = incDecOnUpDown(Model.mixIn2[thisMixNum], 0, NUM_MIXSOURCES - 1, NOWRAP, SLOW_CHANGE);
+          Model.mixIn2[thisMixNum] = incDecOnUpDown(Model.mixIn2[thisMixNum], 0, NUM_MIXSOURCES - 1, NOWRAP, INCDEC_SLOW);
         else if(focusedItem == 9) //adjust weight 2
-          Model.mixIn2Weight[thisMixNum] = incDecOnUpDown(Model.mixIn2Weight[thisMixNum], -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.mixIn2Weight[thisMixNum] = incDecOnUpDown(Model.mixIn2Weight[thisMixNum], -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 10) //adjust offset 2
-          Model.mixIn2Offset[thisMixNum] = incDecOnUpDown(Model.mixIn2Offset[thisMixNum], -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.mixIn2Offset[thisMixNum] = incDecOnUpDown(Model.mixIn2Offset[thisMixNum], -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 11) //adjust differential 2
-          Model.mixIn2Diff[thisMixNum] = incDecOnUpDown(Model.mixIn2Diff[thisMixNum], -100, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.mixIn2Diff[thisMixNum] = incDecOnUpDown(Model.mixIn2Diff[thisMixNum], -100, 100, NOWRAP, INCDEC_NORMAL);
         else if(focusedItem == 12) //change switch
         {
           uint8_t _mixSw = Model.mixOper_N_Switch[thisMixNum] & 0x3F;
-          _mixSw = incDecOnUpDown(_mixSw, 0, NUM_MIXSWITCHES - 1, NOWRAP, SLOW_CHANGE);
+          _mixSw = incDecOnUpDown(_mixSw, 0, NUM_MIXSWITCHES - 1, NOWRAP, INCDEC_SLOW);
           Model.mixOper_N_Switch[thisMixNum] &= ~0x3F; //clear bits 5 to 0
           Model.mixOper_N_Switch[thisMixNum] |= _mixSw;
         }
@@ -1637,7 +1680,7 @@ void handleMainUI()
         
         drawCursor(59, 23);
         
-        destMixNum = incDecOnUpDown(destMixNum, 0, NUM_MIXSLOTS - 1, WRAP, SLOW_CHANGE);
+        destMixNum = incDecOnUpDown(destMixNum, 0, NUM_MIXSLOTS - 1, WRAP, INCDEC_SLOW);
         
         if(clickedButton == SELECT_KEY)
         {
@@ -1729,7 +1772,7 @@ void handleMainUI()
         
         drawCursor(59, 23);
         
-        destMixNum = incDecOnUpDown(destMixNum, 0, NUM_MIXSLOTS - 1, WRAP, SLOW_CHANGE);
+        destMixNum = incDecOnUpDown(destMixNum, 0, NUM_MIXSLOTS - 1, WRAP, INCDEC_SLOW);
         
         if(clickedButton == SELECT_KEY)
         {
@@ -1764,20 +1807,20 @@ void handleMainUI()
         static uint8_t _selectedChannel = 0; //0 is ch1, 1 is ch2, etc.
 
         if (focusedItem == 1)
-          _selectedChannel = incDecOnUpDown(_selectedChannel, 0, NUM_PRP_CHANNLES - 1, WRAP, SLOW_CHANGE); 
+          _selectedChannel = incDecOnUpDown(_selectedChannel, 0, NUM_PRP_CHANNLES - 1, WRAP, INCDEC_SLOW); 
         else if (focusedItem == 2 && isEditMode)
         {
           if(pressedButton == UP_KEY || pressedButton == DOWN_KEY)
             Model.reverse ^= (uint16_t) 1 << _selectedChannel; //toggle bit
         }
         else if (focusedItem == 3)
-          Model.subtrim[_selectedChannel] = incDecOnUpDown(Model.subtrim[_selectedChannel], -20, 20, NOWRAP, SLOW_CHANGE);
+          Model.subtrim[_selectedChannel] = incDecOnUpDown(Model.subtrim[_selectedChannel], -20, 20, NOWRAP, INCDEC_SLOW);
         else if (focusedItem == 4)
-          Model.failsafe[_selectedChannel] = incDecOnUpDown(Model.failsafe[_selectedChannel], -101, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.failsafe[_selectedChannel] = incDecOnUpDown(Model.failsafe[_selectedChannel], -101, 100, NOWRAP, INCDEC_NORMAL);
         else if (focusedItem == 5)
-          Model.endpointL[_selectedChannel] = incDecOnUpDown(Model.endpointL[_selectedChannel], -100, 0, NOWRAP, PRESSED_OR_HELD);
+          Model.endpointL[_selectedChannel] = incDecOnUpDown(Model.endpointL[_selectedChannel], -100, 0, NOWRAP, INCDEC_NORMAL);
         else if (focusedItem == 6)
-          Model.endpointR[_selectedChannel] = incDecOnUpDown(Model.endpointR[_selectedChannel], 0, 100, NOWRAP, PRESSED_OR_HELD);
+          Model.endpointR[_selectedChannel] = incDecOnUpDown(Model.endpointR[_selectedChannel], 0, 100, NOWRAP, INCDEC_NORMAL);
 
         //-------Show on lcd---------------
         display.setCursor(0, 8);
@@ -1875,15 +1918,15 @@ void handleMainUI()
         
         //edit values
         if (focusedItem == 1)
-          Sys.rfOutputEnabled = incDecOnUpDown(Sys.rfOutputEnabled, 0, 1, WRAP, PRESSED_ONLY);
+          Sys.rfOutputEnabled = incDecOnUpDown(Sys.rfOutputEnabled, 0, 1, WRAP, INCDEC_PRESSED_ONLY);
         else if (focusedItem == 2)
-          Sys.rfPower = incDecOnUpDown(Sys.rfPower, 0, RFPOWER_LAST, NOWRAP, PRESSED_ONLY);
+          Sys.rfPower = incDecOnUpDown(Sys.rfPower, 0, RFPOWER_LAST, NOWRAP, INCDEC_PRESSED_ONLY);
         else if (focusedItem == 3)
-          Sys.backlightMode = incDecOnUpDown(Sys.backlightMode, 0, BACKLIGHT_LAST, NOWRAP, PRESSED_ONLY);
+          Sys.backlightMode = incDecOnUpDown(Sys.backlightMode, 0, BACKLIGHT_LAST, NOWRAP, INCDEC_PRESSED_ONLY);
         else if (focusedItem == 4)
-          Sys.soundMode = incDecOnUpDown(Sys.soundMode, 0, SOUND_LAST, NOWRAP, PRESSED_ONLY);
+          Sys.soundMode = incDecOnUpDown(Sys.soundMode, 0, SOUND_LAST, NOWRAP, INCDEC_PRESSED_ONLY);
         else if (focusedItem == 5)
-          Sys.inactivityMinutes = incDecOnUpDown(Sys.inactivityMinutes, 0, 20, NOWRAP, SLOW_CHANGE);
+          Sys.inactivityMinutes = incDecOnUpDown(Sys.inactivityMinutes, 0, 20, NOWRAP, INCDEC_SLOW);
         else if (focusedItem == 6 && isEditMode)
         {
           isRequestingBind = true;
@@ -1936,11 +1979,11 @@ void handleMainUI()
           drawCursor(60, 19 + (focusedItem - 2) * 9);
         
         if(focusedItem == 2)
-          Sys.telemAlarmEnabled = incDecOnUpDown(Sys.telemAlarmEnabled, 0, 1, WRAP, PRESSED_ONLY);
+          Sys.telemAlarmEnabled = incDecOnUpDown(Sys.telemAlarmEnabled, 0, 1, WRAP, INCDEC_PRESSED_ONLY);
         else if(focusedItem == 3)
-          Sys.telemVoltsOnHomeScreen = incDecOnUpDown(Sys.telemVoltsOnHomeScreen, 0, 1, WRAP, PRESSED_ONLY);
+          Sys.telemVoltsOnHomeScreen = incDecOnUpDown(Sys.telemVoltsOnHomeScreen, 0, 1, WRAP, INCDEC_PRESSED_ONLY);
         else if(focusedItem == 4)
-          Model.telemVoltsThresh = incDecOnUpDown(Model.telemVoltsThresh, 0, 2500, NOWRAP, FAST_CHANGE);
+          Model.telemVoltsThresh = incDecOnUpDown(Model.telemVoltsThresh, 0, 2500, NOWRAP, INCDEC_FAST);
         
         if (heldButton == SELECT_KEY)
         {
@@ -2053,7 +2096,7 @@ void handleMainUI()
           if(focusedItem < 10)
           {
             uint8_t _idx = focusedItem - 1;
-            outputChConfig[_idx] = incDecOnUpDown(outputChConfig[_idx], 0, maxOutputChConfig[_idx], WRAP, SLOW_CHANGE);
+            outputChConfig[_idx] = incDecOnUpDown(outputChConfig[_idx], 0, maxOutputChConfig[_idx], WRAP, INCDEC_SLOW);
           }
           else if(focusedItem == 10 && clickedButton == SELECT_KEY)
           {
@@ -2159,7 +2202,7 @@ void handleMainUI()
           display.print(F("Adjust deadzone"));
           
           drawCursor(51, 34);
-          Sys.deadZonePerc = incDecOnUpDown(Sys.deadZonePerc, 0, 15, NOWRAP, PRESSED_OR_HELD);
+          Sys.deadZonePerc = incDecOnUpDown(Sys.deadZonePerc, 0, 15, NOWRAP, INCDEC_NORMAL);
           
           display.setCursor(59,34);
           display.print(Sys.deadZonePerc);
@@ -2305,16 +2348,18 @@ int incDecOnUpDown(int _val, int _lowerLimit, int _upperLimit, bool _enableWrap,
   }
 
   uint8_t _heldBtn = 0;
-  if(_state == PRESSED_OR_HELD || _state == FAST_CHANGE) 
+  if((_state == INCDEC_SLOW && thisLoopNum % (125 / fixedLoopTime) == 1)
+     || _state == INCDEC_NORMAL 
+     || _state == INCDEC_FAST
+    )
+  {
     _heldBtn = heldButton;
-  else if(_state == SLOW_CHANGE && thisLoopNum % (125 / fixedLoopTime) == 1) 
-    _heldBtn = heldButton;
+  }
 
-  //Default -- UP_KEY increments, DOWN_KEY decrements
+  //Default is UP_KEY increments, DOWN_KEY decrements
   uint8_t incrKey = UP_KEY;
   uint8_t decrKey = DOWN_KEY;
-  // UP_KEY decrements, DOWN_KEY increments 
-  if(_lowerLimit > _upperLimit) 
+  if(_lowerLimit > _upperLimit) // UP_KEY decrements, DOWN_KEY increments 
   {
     //swap lower and upper limits
     int _tmp = _lowerLimit;
@@ -2324,15 +2369,18 @@ int incDecOnUpDown(int _val, int _lowerLimit, int _upperLimit, bool _enableWrap,
     incrKey = DOWN_KEY;
     decrKey = UP_KEY;
   }
-   
+  
   int delta = 1;
-  if(_heldBtn > 0 && (millis() - buttonStartTime > (LONGPRESSTIME + 1000UL)) && _state != SLOW_CHANGE)
-    delta = 2; //speed up increment
-  if(_heldBtn > 0 && (millis() - buttonStartTime > (LONGPRESSTIME + 3000UL)) && _state == FAST_CHANGE)
-    delta = 10;
+  if(_state >= INCDEC_NORMAL && _heldBtn > 0)
+  {
+    if(millis() - buttonStartTime > (LONGPRESSTIME + 1000UL))
+      delta = 2; 
+    if(millis() - buttonStartTime > (LONGPRESSTIME + 3000UL) && _state == INCDEC_FAST)
+      delta = 10;
+  }
 
   //inc dec
-  if (pressedButton == incrKey || _heldBtn == incrKey)
+  if(pressedButton == incrKey || _heldBtn == incrKey)
   {
     _val += delta;
     if(_val > _upperLimit)
@@ -2362,7 +2410,7 @@ void changeFocusOnUPDOWN(uint8_t _maxItemNo)
     return;
   
   isEditMode = true;
-  focusedItem = incDecOnUpDown(focusedItem, _maxItemNo, 1, WRAP, SLOW_CHANGE);
+  focusedItem = incDecOnUpDown(focusedItem, _maxItemNo, 1, WRAP, INCDEC_SLOW);
   isEditMode = false;
 }
 

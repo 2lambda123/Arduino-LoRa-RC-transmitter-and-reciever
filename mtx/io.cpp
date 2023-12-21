@@ -9,6 +9,7 @@ int applySlow(int _currentVal, int _targetVal, uint16_t _riseTime, uint16_t _fal
 int weightAndOffset(int _input, int _weight, int _offset, int _diff);
 bool mixSwitchIsActive(uint8_t _mixNum);
 void evaluateTimer1(int16_t srcVal);
+int generateWaveform();
 
 //==================================================================================================
 
@@ -156,11 +157,11 @@ void readSticks()
   else if(knobIn < -25) _knobRegion = _NEG_SIDE;
   
   //detect inactivity
-  static int16_t _lastSticksAvg = 0;
-  int16_t _sticksAvg = (rollIn + pitchIn + throttleIn + yawIn + knobIn) / 5;
-  if(abs(_sticksAvg - _lastSticksAvg) > 6) //3% of 1000 is 30, divide by 5
+  static int16_t _lastSticksSum = 0;
+  int16_t _sticksSum = rollIn + pitchIn + throttleIn + yawIn + knobIn;
+  if(abs(_sticksSum - _lastSticksSum) > 30) //3% of 1000
   {
-    _lastSticksAvg = _sticksAvg;
+    _lastSticksSum = _sticksSum;
     inputsLastMoved = millis();
   }
 
@@ -219,6 +220,9 @@ void computeChannelOutputs()
   static int _valueNow = mixSources[IDX_SLOW1];
   mixSources[IDX_SLOW1] = applySlow(_valueNow, mixSources[Model.slow1Src], Model.slow1Up * 100, Model.slow1Down * 100);
   _valueNow = mixSources[IDX_SLOW1];
+  
+  ///--Mix source FuncGen
+  mixSources[IDX_FUNCGEN] = generateWaveform();
   
   ///--Predefined mixes
   //So we don't waste the limited mixer slots
@@ -570,4 +574,89 @@ void evaluateTimer1(int16_t srcVal)
   }
   else
     timer1ElapsedTime = timer1LastElapsedTime + millis() - timer1LastPaused;
+}
+
+//--------------------------------------------------------------------------------------------------
+
+// Table for generating stepped sine waveform. 100 values
+// Values have been offset about 100 so range is 0 to 200
+static const uint8_t sineForm[] PROGMEM = {
+  100, 106, 113, 119, 125, 131, 137, 143, 148, 154, 159, 164, 168, 173, 177, 181, 184, 188, 190, 
+  193, 195, 197, 198, 199, 200, 
+  200, 200, 199, 198, 197, 195, 193, 190, 188, 184, 181, 177, 173, 168, 164, 159, 154, 148, 143, 
+  137, 131, 125, 119, 113, 106, 
+  100, 94, 87, 81, 75, 69, 63, 57, 52, 46, 41, 36, 32, 27, 23, 19, 16, 12, 10, 7, 5, 3, 2, 1, 0, 
+  0, 0, 1, 2, 3, 5, 7, 10, 12, 16, 19, 23, 27, 32, 36, 41, 46, 52, 57, 63, 69, 75, 81, 87, 94, 
+};
+
+int generateWaveform()
+{
+  // When the period is being adjusted there is a sudden discontinuity in the result that causes the servo to jerk. 
+  // We thus need a way to smoothly transition to the new period. 
+  // One approach is to wait for peak or zero crossing before applying the new period. However this 
+  // isn't ideal if the period is long.
+  // The better approach is to add some calculated offset to millis so that we maintain the next ratio of 
+  // timeInstance/period upon change. 
+  // To get the offset the equation used is (newTimeInstance + offset)/period = nextRatio
+
+  int period = Model.funcgenPeriod * 100;
+  static int oldPeriod = 500;
+  static int offset = 0;
+  
+  int timeInstance = (millis() + offset) % oldPeriod;
+  int nextRatio = (timeInstance * 1000L) / oldPeriod;  //scalingfactor 1000 just to avoid floating point math
+  
+  if(period != oldPeriod)
+  {
+    oldPeriod = period;
+    int newTimeInstance = millis() % period;
+    offset = (((long) period * nextRatio)/1000L) - newTimeInstance; 
+  }
+  
+  timeInstance = (millis() + offset) % period; //recalculate
+  
+  int result = 0;
+  
+  switch(Model.funcgenWaveform)
+  {
+    case FUNC_SINE:
+    {
+      //--fixed point arithmetic with 2 decimal places for fractional part--
+      int index = (timeInstance * 10000L)/period; /*upper 2 digits are the actual index in the LUT,
+      the lower 2 digits are the fractional part used for linear interpolation*/
+      uint8_t indexLUT = index / 100; //100 is scaling factor
+      int valL = 5 * pgm_read_byte(&sineForm[indexLUT]) - 500;
+      indexLUT++; if(indexLUT > 99) indexLUT = 0;
+      int valR = 5 * pgm_read_byte(&sineForm[indexLUT]) - 500;
+      result = valL + (((valR - valL)*(index % 100))/100); //100 is scaling factor
+    }
+    break;
+    
+    case FUNC_SAWTOOTH:
+    {
+      result = map(timeInstance, 0, period - 1, -500, 500);
+    }
+    break;
+    
+    case FUNC_TRIANGLE:
+    {
+      if(timeInstance < (period/2))
+        result = map(timeInstance, 0, period/2 - 1, -500, 500);
+      else
+        result = map(timeInstance, period/2, period - 1, 500, -500);
+    }
+    break;
+    
+    case FUNC_SQUARE:
+    {
+      if(timeInstance < (period/2))
+        result = -500;
+      else
+        result = 500;
+    }
+    break;
+  }
+  
+  result = constrain(result, -500, 500);
+  return result;
 }

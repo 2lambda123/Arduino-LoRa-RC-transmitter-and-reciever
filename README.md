@@ -1,3 +1,5 @@
+### NOTE: This project has been superseded by FreeTX https://github.com/buk7456/FreeTX
+
 # Arduino Lora based RC system
 Control just about anything RC
 
@@ -23,7 +25,7 @@ Control just about anything RC
 <img src="img1.jpg" width="785" height="560"/>
 </p>
 
-#### Transmitter
+### Transmitter
 - 2x Atmega328p microcontrollers
 - 1x Semtech SX1276/77/78/79 based RF module 
 - 128x64 KS0108 based LCD, or any 128x64 LCD (provide own driver code).
@@ -31,7 +33,7 @@ Control just about anything RC
 - 3x push buttons
 - Additional support components
 
-#### Receiver
+### Receiver
 - 1x Atmega328p microcontroller
 - 1x Semtech SX1276/77/78/79 based RF module
 - Additional support components
@@ -67,6 +69,7 @@ Mixer slots are evaluated sequentially.
 <br> Mixer sources can be any of the following
 - Raw stick inputs (roll, pitch, thrt, yaw, knob)
 - Constants (max)
+- Function generator
 - Switches (SwA, SwB, SwC, SwD, SwE, SwF)
 - Slowed input (appears with an asterisk)
 - Curves (Ail, Ele, Thrt, Rud)
@@ -75,7 +78,7 @@ Mixer slots are evaluated sequentially.
 
 The default mapping is Ail to Ch1, Ele to Ch2, Thrt to Ch3, Rud to Ch4, unless overridden in the mixer.
 
-##### [Example mixes](mixer.md)
+### [Example mixes](mixer.md)
 
 ## Configuring RC channel outputs
 The receiver outputs can be configured from the transmitter to any of the three signal types; servo PWM, digital on-off, or 'normal' PWM.
