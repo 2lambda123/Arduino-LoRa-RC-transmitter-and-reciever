@@ -1,8 +1,8 @@
 #ifndef _EESTORE_H_
 #define _EESTORE_H_
 
-#define EE_FILE_SIGNATURE_ADDR 0  //2 bytes
-#define EE_INITFLAG_ADDR       2  //1 byte
+#define EE_FILE_SIGNATURE_ADDR 0 // 2 bytes
+#define EE_INITFLAG_ADDR 2       // 1 byte
 
 void eraseEEPROM();
 
@@ -11,10 +11,10 @@ void eeStoreInit();
 void eeReadSysConfig();
 void eeSaveSysConfig();
 
-void eeReadModelData(uint8_t _mdlNo); 
+void eeReadModelData(uint8_t _mdlNo);
 void eeSaveModelData(uint8_t _mdlNo);
 
-void eeCopyModelName(char* _buff, uint8_t _mdlNo);
+void eeCopyModelName(char *_buff, uint8_t _mdlNo);
 
 void eeCreateModel(uint8_t _mdlNo);
 void eeDeleteModel(uint8_t _mdlNo);

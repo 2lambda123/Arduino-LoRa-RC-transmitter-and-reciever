@@ -1,12 +1,12 @@
 /*
   Adapted by BUK, from Adafruit GFX lib.
-  
-  This library has been tailored to this project so this means some features have been removed or 
-  modified for lower flash usage, reduced overhead, and to speed up drawing operations.
-  Changes made:
+
+  This library has been tailored to this project so this means some features
+  have been removed or modified for lower flash usage, reduced overhead, and to
+  speed up drawing operations. Changes made:
     - Reimplemented drawHLine, drawVLine, drawRect, fillRect
-    - Removed unused features like Bresenham's line algorithm, circles, triangles, round rectangles,
-      fonts, etc.
+    - Removed unused features like Bresenham's line algorithm, circles,
+  triangles, round rectangles, fonts, etc.
     - Using uint8_t types
 
   Copyright (c) 2013 Adafruit Industries.  All rights reserved.
@@ -36,9 +36,7 @@
 #include "GFX.h"
 #include <avr/pgmspace.h>
 
-
-GFX::GFX(uint8_t w, uint8_t h) : WIDTH(w), HEIGHT(h)
-{
+GFX::GFX(uint8_t w, uint8_t h) : WIDTH(w), HEIGHT(h) {
   _width = WIDTH;
   _height = HEIGHT;
   rotation = 0;
@@ -47,50 +45,39 @@ GFX::GFX(uint8_t w, uint8_t h) : WIDTH(w), HEIGHT(h)
   wrap = true;
 }
 
-void GFX::drawHLine(uint8_t x, uint8_t y, uint8_t w, uint8_t color)
-{
+void GFX::drawHLine(uint8_t x, uint8_t y, uint8_t w, uint8_t color) {
   for (uint8_t i = 0; i < w; i++)
     drawPixel(x + i, y, color);
 }
 
-
-void GFX::drawVLine(uint8_t x, uint8_t y, uint8_t h, uint8_t color)
-{
+void GFX::drawVLine(uint8_t x, uint8_t y, uint8_t h, uint8_t color) {
   for (uint8_t i = 0; i < h; i++)
-    drawPixel(x, y+i, color);
+    drawPixel(x, y + i, color);
 }
 
-
-void GFX::drawRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color)
-{
+void GFX::drawRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color) {
   drawHLine(x, y, w, color);
-  drawHLine(x, y+h-1, w, color);
+  drawHLine(x, y + h - 1, w, color);
   drawVLine(x, y, h, color);
-  drawVLine(x+w-1, y, h, color);
+  drawVLine(x + w - 1, y, h, color);
 }
 
-
-void GFX::fillRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color)
-{
-  for (uint8_t i = 0; i < w; i++)
-  {
+void GFX::fillRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color) {
+  for (uint8_t i = 0; i < w; i++) {
     for (uint8_t j = 0; j < h; j++)
       drawPixel(x + i, y + j, color);
   }
 }
 
-
 // Draw a PROGMEM-resident 1-bit image at the specified (x,y) position,
 // using the specified foreground color (unset bits are transparent).
-void GFX::drawBitmap(uint8_t x, uint8_t y, const uint8_t bitmap[], uint8_t w, uint8_t h, uint8_t color)
-{
+void GFX::drawBitmap(uint8_t x, uint8_t y, const uint8_t bitmap[], uint8_t w,
+                     uint8_t h, uint8_t color) {
   uint8_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
   uint8_t byte = 0;
 
-  for (uint8_t j = 0; j < h; j++, y++)
-  {
-    for (uint8_t i = 0; i < w; i++)
-    {
+  for (uint8_t j = 0; j < h; j++, y++) {
+    for (uint8_t i = 0; i < w; i++) {
       if (i & 7)
         byte <<= 1;
       else
@@ -103,73 +90,45 @@ void GFX::drawBitmap(uint8_t x, uint8_t y, const uint8_t bitmap[], uint8_t w, ui
 
 // Draw a character
 // Code page 437 character set
-void GFX::drawChar(uint8_t x, uint8_t y, unsigned char c, uint8_t color)
-{
-  for (int8_t i = 0; i < 5; i++)
-  { // Char bitmap = 5 columns
+void GFX::drawChar(uint8_t x, uint8_t y, unsigned char c, uint8_t color) {
+  for (int8_t i = 0; i < 5; i++) { // Char bitmap = 5 columns
     uint8_t line = pgm_read_byte(&font[c * 5 + i]);
-    for (int8_t j = 0; j < 8; j++, line >>= 1)
-    {
+    for (int8_t j = 0; j < 8; j++, line >>= 1) {
       if (line & 1)
         drawPixel(x + i, y + j, color);
     }
   }
 }
 
-size_t GFX::write(uint8_t c)
-{
-  if (c == '\n')
-  { // Newline?
-    cursor_x  = 0;  // Reset x to zero,
-    cursor_y += 8;  // advance y one line
-  }
-  else if (c != '\r')
-  { // Ignore carriage returns
-    if (wrap && ((cursor_x + 6) > _width))
-    { // Off right?
-      cursor_x  = 0; // Reset x to zero,
-      cursor_y += 8; // advance y one line
+size_t GFX::write(uint8_t c) {
+  if (c == '\n') {                           // Newline?
+    cursor_x = 0;                            // Reset x to zero,
+    cursor_y += 8;                           // advance y one line
+  } else if (c != '\r') {                    // Ignore carriage returns
+    if (wrap && ((cursor_x + 6) > _width)) { // Off right?
+      cursor_x = 0;                          // Reset x to zero,
+      cursor_y += 8;                         // advance y one line
     }
     drawChar(cursor_x, cursor_y, c, textcolor);
-    cursor_x += 6;   // Advance x one char
+    cursor_x += 6; // Advance x one char
   }
   return 1;
 }
 
-void GFX::setCursor(uint8_t x, uint8_t y)
-{
+void GFX::setCursor(uint8_t x, uint8_t y) {
   cursor_x = x;
   cursor_y = y;
 }
 
-uint8_t GFX::getCursorX(void) const
-{
-  return cursor_x;
-}
+uint8_t GFX::getCursorX(void) const { return cursor_x; }
 
-uint8_t GFX::getCursorY(void) const
-{
-  return cursor_y;
-}
+uint8_t GFX::getCursorY(void) const { return cursor_y; }
 
-void GFX::setTextColor(uint8_t c)
-{
-  textcolor = c;
-}
+void GFX::setTextColor(uint8_t c) { textcolor = c; }
 
-void GFX::setTextWrap(boolean w)
-{
-  wrap = w;
-}
+void GFX::setTextWrap(boolean w) { wrap = w; }
 
 // Return the size of the display (per current rotation)
-uint8_t GFX::width(void) const
-{
-  return _width;
-}
+uint8_t GFX::width(void) const { return _width; }
 
-uint8_t GFX::height(void) const
-{
-  return _height;
-}
-
+uint8_t GFX::height(void) const { return _height; }

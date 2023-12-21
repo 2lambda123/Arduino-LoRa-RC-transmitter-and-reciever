@@ -11,8 +11,8 @@ void showEEFormatConfirmation();
 
 void startStickCalibration();
 
-void handleStartupMenu(); 
+void handleStartupMenu();
 
-void handleMainUI(); 
+void handleMainUI();
 
 #endif
