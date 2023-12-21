@@ -1,5 +1,5 @@
-#include "Arduino.h"
 #include "common.h"
+#include "Arduino.h"
 
 sysParams_t Sys;
 modelParams_t Model;
@@ -47,7 +47,6 @@ uint8_t receiverPacketRate = 0;
 
 uint16_t telem_volts = 0x0FFF;
 
-
 uint8_t outputChConfig[9];
 uint8_t maxOutputChConfig[9];
 bool gotOutputChConfig = false;
@@ -59,93 +58,87 @@ uint8_t maxNumOfModels;
 
 uint32_t thisLoopNum = 0;
 
-void setDefaultSystemParams()
-{
-    Sys.activeModel = 1;
-    Sys.rfOutputEnabled = false;
-    Sys.rfPower = RFPOWER_10dBm;
-    Sys.inactivityMinutes = 10;
-    Sys.soundMode = SOUND_ALL;
-    Sys.backlightMode = BACKLIGHT_60S;
+void setDefaultSystemParams() {
+  Sys.activeModel = 1;
+  Sys.rfOutputEnabled = false;
+  Sys.rfPower = RFPOWER_10dBm;
+  Sys.inactivityMinutes = 10;
+  Sys.soundMode = SOUND_ALL;
+  Sys.backlightMode = BACKLIGHT_60S;
 
-    Sys.rollMax  = 1023, Sys.rollMin  = 0, Sys.rollCenterVal = 512;
-    Sys.yawMax   = 1023, Sys.yawMin   = 0, Sys.yawCenterVal = 512;
-    Sys.pitchMax = 1023, Sys.pitchMin = 0, Sys.pitchCenterVal = 512;
-    Sys.thrtlMax = 1023, Sys.thrtlMin = 0;
-    Sys.deadZonePerc = 5;
+  Sys.rollMax = 1023, Sys.rollMin = 0, Sys.rollCenterVal = 512;
+  Sys.yawMax = 1023, Sys.yawMin = 0, Sys.yawCenterVal = 512;
+  Sys.pitchMax = 1023, Sys.pitchMin = 0, Sys.pitchCenterVal = 512;
+  Sys.thrtlMax = 1023, Sys.thrtlMin = 0;
+  Sys.deadZonePerc = 5;
 
-    Sys.telemAlarmEnabled = true;
-    Sys.telemVoltsOnHomeScreen = true;
+  Sys.telemAlarmEnabled = true;
+  Sys.telemVoltsOnHomeScreen = true;
 }
 
-void setDefaultModelName()
-{
-    uint8_t len = sizeof(Model.modelName);
-    for(uint8_t i = 0; i < len - 1; i++)
-        Model.modelName[i] = ' ';
-    Model.modelName[len - 1] = '\0';
+void setDefaultModelName() {
+  uint8_t len = sizeof(Model.modelName);
+  for (uint8_t i = 0; i < len - 1; i++)
+    Model.modelName[i] = ' ';
+  Model.modelName[len - 1] = '\0';
 }
 
-void setDefaultModelBasicParams()
-{
-    Model.reverse = 0;
-    for(uint8_t i = 0; i < NUM_PRP_CHANNLES; i++)
-    {
-        Model.endpointL[i] = -100;
-        Model.endpointR[i] = 100;
-        Model.subtrim[i]   = 0;
-        Model.failsafe[i]  = -101;
-    }
-    Model.failsafe[2]  = -100; //specify failsafe on channel 3 (default throttle channel)
+void setDefaultModelBasicParams() {
+  Model.reverse = 0;
+  for (uint8_t i = 0; i < NUM_PRP_CHANNLES; i++) {
+    Model.endpointL[i] = -100;
+    Model.endpointR[i] = 100;
+    Model.subtrim[i] = 0;
+    Model.failsafe[i] = -101;
+  }
+  Model.failsafe[2] =
+      -100; // specify failsafe on channel 3 (default throttle channel)
 
-    Model.trim[0] = 0;
-    Model.trim[1] = 0;
-    Model.trim[2] = 0;
-    Model.trim[3] = 0;
+  Model.trim[0] = 0;
+  Model.trim[1] = 0;
+  Model.trim[2] = 0;
+  Model.trim[3] = 0;
 
-    Model.dualRate = 0;
-    for(uint8_t i = 0; i < 3; i++)
-    {
-        Model.rateNormal[i] = 100;
-        Model.rateSport[i]  = 100;
-        Model.expoNormal[i] = 0;
-        Model.expoSport[i]  = 0;
-    }
+  Model.dualRate = 0;
+  for (uint8_t i = 0; i < 3; i++) {
+    Model.rateNormal[i] = 100;
+    Model.rateSport[i] = 100;
+    Model.expoNormal[i] = 0;
+    Model.expoSport[i] = 0;
+  }
 
-    Model.throttlePts[0] = -100;
-    Model.throttlePts[1] = -50;
-    Model.throttlePts[2] = 0;
-    Model.throttlePts[3] = 50;
-    Model.throttlePts[4] = 100;
+  Model.throttlePts[0] = -100;
+  Model.throttlePts[1] = -50;
+  Model.throttlePts[2] = 0;
+  Model.throttlePts[3] = 50;
+  Model.throttlePts[4] = 100;
 
-    Model.slow1Src = IDX_SWC;
-    Model.slow1Up = 5;
-    Model.slow1Down = 5;
+  Model.slow1Src = IDX_SWC;
+  Model.slow1Up = 5;
+  Model.slow1Down = 5;
 
-    Model.timer1ControlSrc = IDX_NONE;
-    Model.timer1Operator = GREATER_THAN;
-    Model.timer1Value = 0;
-    Model.timer1InitMins = 0;
+  Model.timer1ControlSrc = IDX_NONE;
+  Model.timer1Operator = GREATER_THAN;
+  Model.timer1Value = 0;
+  Model.timer1InitMins = 0;
 
-    Model.telemVoltsThresh = 0;
+  Model.telemVoltsThresh = 0;
 }
 
-void setDefaultModelMixerParams(uint8_t _mixNo)
-{
-    Model.mixIn1[_mixNo]        = IDX_NONE;
-    Model.mixIn1Offset[_mixNo]  = 0;
-    Model.mixIn1Weight[_mixNo]  = 0;
-    Model.mixIn1Diff[_mixNo]    = 0;
-    Model.mixIn2[_mixNo]        = IDX_NONE;
-    Model.mixIn2Offset[_mixNo]  = 0;
-    Model.mixIn2Weight[_mixNo]  = 0;
-    Model.mixIn2Diff[_mixNo]    = 0;
-    Model.mixOper_N_Switch[_mixNo] = MIX_ADD << 6 | SW_NONE;
-    Model.mixOut[_mixNo]        = IDX_NONE;
+void setDefaultModelMixerParams(uint8_t _mixNo) {
+  Model.mixIn1[_mixNo] = IDX_NONE;
+  Model.mixIn1Offset[_mixNo] = 0;
+  Model.mixIn1Weight[_mixNo] = 0;
+  Model.mixIn1Diff[_mixNo] = 0;
+  Model.mixIn2[_mixNo] = IDX_NONE;
+  Model.mixIn2Offset[_mixNo] = 0;
+  Model.mixIn2Weight[_mixNo] = 0;
+  Model.mixIn2Diff[_mixNo] = 0;
+  Model.mixOper_N_Switch[_mixNo] = MIX_ADD << 6 | SW_NONE;
+  Model.mixOut[_mixNo] = IDX_NONE;
 }
 
-void setDefaultModelMixerParams()
-{
-    for(uint8_t i = 0; i < NUM_MIXSLOTS; i++)
-        setDefaultModelMixerParams(i);
+void setDefaultModelMixerParams() {
+  for (uint8_t i = 0; i < NUM_MIXSLOTS; i++)
+    setDefaultModelMixerParams(i);
 }
